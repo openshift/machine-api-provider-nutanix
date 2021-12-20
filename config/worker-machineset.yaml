@@ -1,0 +1,31 @@
+---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  name: worker-machineset
+  namespace: default
+  labels:
+    machine.openshift.io/cluster-api-cluster: nutanix-actuator-k8s
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-machineset: worker-machine
+      machine.openshift.io/cluster-api-cluster: nutanix-actuator-k8s
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-machineset: worker-machine
+        machine.openshift.io/cluster-api-cluster: nutanix-actuator-k8s
+    spec:
+      metadata:
+        labels:
+          node-role.kubernetes.io/compute: ""
+      providerSpec:
+        value:
+          apiVersion: nutanixproviderconfig.openshift.io/v1beta1
+          kind: NutanixMachineProviderConfig
+          userDataSecret:
+            name: worker-userdata-secret
+          credentialsSecret:
+            name: nutanix-creds-secret

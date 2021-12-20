@@ -1,0 +1,20 @@
+---
+apiVersion: machine.openshift.io/v1beta1
+kind: Machine
+metadata:
+  name: master-machine
+  namespace: default
+  labels:
+    machine.openshift.io/cluster-api-cluster: nutanix-actuator-k8s
+spec:
+  metadata:
+    labels:
+      node-role.kubernetes.io/master: ""
+  providerSpec:
+    value:
+      apiVersion: nutanixproviderconfig.openshift.io/v1beta1
+      kind: NutanixMachineProviderConfig
+      userDataSecret:
+        name: master-userdata-secret
+      credentialsSecret:
+        name: nutanix-creds-secret
