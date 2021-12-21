@@ -6,8 +6,8 @@ import (
 
 	"k8s.io/klog/v2"
 
-	nutanixClient "github.com/nutanix-core/cluster-api-nutanix-go-client/pkg/nutanix"
-	nutanixClientV3 "github.com/nutanix-core/cluster-api-nutanix-go-client/pkg/nutanix/v3"
+	nutanixClient "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix"
+	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix/v3"
 )
 
 const (

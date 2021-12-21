@@ -7,7 +7,7 @@ import (
 
 	"k8s.io/klog"
 
-	nutanixClientV3 "github.com/nutanix-core/cluster-api-nutanix-go-client/pkg/nutanix/v3"
+	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix/v3"
 )
 
 type stateRefreshFunc func() (string, error)

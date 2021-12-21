@@ -1,5 +1,6 @@
 /*
-Copyright The Kubernetes Authors.
+Copyright 2021 Nutanix Inc.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -19,7 +20,6 @@ import (
 	"fmt"
 	"testing"
 
-	nutanixv1 "github.com/nutanix-core/cluster-api-openshift-mapi-provider-nutanix/pkg/apis/nutanixprovider/v1beta1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
@@ -33,6 +33,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+
+	nutanixv1 "github.com/nutanix-cloud-native/machine-api-provider-nutanix/pkg/apis/nutanixprovider/v1beta1"
 )
 
 var _ = Describe("MachineSet Reconciler", func() {

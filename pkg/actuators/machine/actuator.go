@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2021 Nutanix Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,14 +20,13 @@ import (
 	"context"
 	"fmt"
 
-	nutanixv1 "github.com/nutanix-core/cluster-api-openshift-mapi-provider-nutanix/pkg/apis/nutanixprovider/v1beta1"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
-	//nutanixclient "github.com/nutanix-core/cluster-api-nutanix-go-client/pkg/nutanix"
-	//nutanixClientV3 "github.com/nutanix-core/cluster-api-nutanix-go-client/pkg/nutanix/v3"
+
+	nutanixv1 "github.com/nutanix-cloud-native/machine-api-provider-nutanix/pkg/apis/nutanixprovider/v1beta1"
 )
 
 const (
@@ -41,26 +40,23 @@ const (
 
 // Actuator is responsible for performing machine reconciliation.
 type Actuator struct {
-	client        runtimeclient.Client
-	eventRecorder record.EventRecorder
-	//nutanixClient       nutanixClientV3.Client
+	client              runtimeclient.Client
+	eventRecorder       record.EventRecorder
 	configManagedClient runtimeclient.Client
 }
 
 // ActuatorParams holds parameter information for Actuator.
 type ActuatorParams struct {
-	Client        runtimeclient.Client
-	EventRecorder record.EventRecorder
-	//NutanixClient       nutanixClientV3.Client
+	Client              runtimeclient.Client
+	EventRecorder       record.EventRecorder
 	ConfigManagedClient runtimeclient.Client
 }
 
 // NewActuator returns an actuator.
 func NewActuator(params ActuatorParams) *Actuator {
 	return &Actuator{
-		client:        params.Client,
-		eventRecorder: params.EventRecorder,
-		//nutanixClient:       params.NutanixClient,
+		client:              params.Client,
+		eventRecorder:       params.EventRecorder,
 		configManagedClient: params.ConfigManagedClient,
 	}
 }
@@ -109,10 +105,9 @@ func (a *Actuator) Exists(ctx context.Context, machine *machinev1.Machine) (bool
 	klog.Infof("[Machine: %s]: actuator checking if machine exists", machine.GetName())
 
 	scope, err := newMachineScope(machineScopeParams{
-		Context: ctx,
-		client:  a.client,
-		machine: machine,
-		//nutanixClient:       a.nutanixClient,
+		Context:             ctx,
+		client:              a.client,
+		machine:             machine,
 		configManagedClient: a.configManagedClient,
 	})
 	if err != nil {
@@ -126,10 +121,9 @@ func (a *Actuator) Update(ctx context.Context, machine *machinev1.Machine) error
 	klog.Infof("%s: actuator updating machine", machine.GetName())
 
 	scope, err := newMachineScope(machineScopeParams{
-		Context: ctx,
-		client:  a.client,
-		machine: machine,
-		//nutanixClient:       a.nutanixClient,
+		Context:             ctx,
+		client:              a.client,
+		machine:             machine,
 		configManagedClient: a.configManagedClient,
 	})
 	if err != nil {
@@ -171,10 +165,9 @@ func (a *Actuator) Delete(ctx context.Context, machine *machinev1.Machine) error
 	klog.Infof("%s: actuator deleting machine", machine.GetName())
 
 	scope, err := newMachineScope(machineScopeParams{
-		Context: ctx,
-		client:  a.client,
-		machine: machine,
-		//nutanixClient:       a.nutanixClient,
+		Context:             ctx,
+		client:              a.client,
+		machine:             machine,
 		configManagedClient: a.configManagedClient,
 	})
 	if err != nil {

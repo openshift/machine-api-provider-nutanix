@@ -29,7 +29,7 @@ GOARCH  ?= $(shell go env GOARCH)
 GOOS    ?= $(shell go env GOOS)
 
 VERSION     ?= $(shell git describe --always --abbrev=7)
-REPO_PATH   ?= github.com/nutanix-core/cluster-api-openshift-mapi-provider-nutanix
+REPO_PATH   ?= github.com/nutanix-cloud-native/machine-api-provider-nutanix
 LD_FLAGS    ?= -X $(REPO_PATH)/pkg/version.Raw=$(VERSION) -extldflags "-static"
 MUTABLE_TAG ?= latest
 IMAGE        = public.ecr.aws/g7v6l0u0/openshift/mapi-provider-nutanix

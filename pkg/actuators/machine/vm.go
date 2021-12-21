@@ -8,9 +8,9 @@ import (
 
 	"k8s.io/klog/v2"
 
-	nutanixClientV3 "github.com/nutanix-core/cluster-api-nutanix-go-client/pkg/nutanix/v3"
-	"github.com/nutanix-core/cluster-api-nutanix-go-client/pkg/utils"
-	clientpkg "github.com/nutanix-core/cluster-api-openshift-mapi-provider-nutanix/pkg/client"
+	clientpkg "github.com/nutanix-cloud-native/machine-api-provider-nutanix/pkg/client"
+	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix/v3"
+	"github.com/nutanix-cloud-native/prism-go-client/pkg/utils"
 )
 
 // CreateVM creates a VM and is invoked by the NutanixMachineReconciler

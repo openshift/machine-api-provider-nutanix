@@ -6,15 +6,15 @@ import (
 	"os"
 
 	machinev1 "github.com/openshift/api/machine/v1beta1"
-	machineapierros "github.com/openshift/machine-api-operator/pkg/controller/machine"
+	machineapierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	corev1 "k8s.io/api/core/v1"
 	apimachineryerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog/v2"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	nutanixClientV3 "github.com/nutanix-core/cluster-api-nutanix-go-client/pkg/nutanix/v3"
-	nutanixv1 "github.com/nutanix-core/cluster-api-openshift-mapi-provider-nutanix/pkg/apis/nutanixprovider/v1beta1"
-	clientpkg "github.com/nutanix-core/cluster-api-openshift-mapi-provider-nutanix/pkg/client"
+	nutanixv1 "github.com/nutanix-cloud-native/machine-api-provider-nutanix/pkg/apis/nutanixprovider/v1beta1"
+	clientpkg "github.com/nutanix-cloud-native/machine-api-provider-nutanix/pkg/client"
+	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix/v3"
 )
 
 const (
@@ -59,12 +59,12 @@ func newMachineScope(params machineScopeParams) (*machineScope, error) {
 
 	providerSpec, err := nutanixv1.ProviderSpecFromRawExtension(params.machine.Spec.ProviderSpec.Value)
 	if err != nil {
-		return nil, machineapierros.InvalidMachineConfiguration("failed to get machine config: %v", err)
+		return nil, machineapierrors.InvalidMachineConfiguration("failed to get machine config: %v", err)
 	}
 
 	providerStatus, err := nutanixv1.ProviderStatusFromRawExtension(params.machine.Status.ProviderStatus)
 	if err != nil {
-		return nil, machineapierros.InvalidMachineConfiguration("failed to get machine provider status: %v", err.Error())
+		return nil, machineapierrors.InvalidMachineConfiguration("failed to get machine provider status: %v", err.Error())
 	}
 
 	mscp := &machineScope{
@@ -79,7 +79,7 @@ func newMachineScope(params machineScopeParams) (*machineScope, error) {
 	mscp.getNutanixCredentials()
 	nutanixClient, err := clientpkg.Client(clientpkg.ClientOptions{Debug: true})
 	if err != nil {
-		return nil, machineapierros.InvalidMachineConfiguration("failed to create nutanix client: %v", err.Error())
+		return nil, machineapierrors.InvalidMachineConfiguration("failed to create nutanix client: %v", err.Error())
 	}
 
 	mscp.nutanixClient = nutanixClient
@@ -102,7 +102,6 @@ func (s *machineScope) getNutanixCredentials() {
 		return
 	}
 
-	//klog.Infof("[Machine: %s] the credentials secret '%s' data: %+v", s.machine.Name, credsSecretKey.Name, credsSecret.Data)
 	if endpoint, ok := credsSecret.Data[clientpkg.NutanixEndpointKey]; ok {
 		os.Setenv(clientpkg.NutanixEndpointKey, string(endpoint))
 	}
@@ -123,7 +122,7 @@ func (s *machineScope) patchMachine() error {
 
 	providerStatus, err := nutanixv1.RawExtensionFromProviderStatus(s.providerStatus)
 	if err != nil {
-		return machineapierros.InvalidMachineConfiguration("failed to get machine provider status: %v", err.Error())
+		return machineapierrors.InvalidMachineConfiguration("failed to get machine provider status: %v", err.Error())
 	}
 	s.machine.Status.ProviderStatus = providerStatus
 
@@ -131,16 +130,18 @@ func (s *machineScope) patchMachine() error {
 
 	// patch machine
 	if err := s.client.Patch(context.Background(), s.machine, s.machineToBePatched); err != nil {
-		klog.Errorf("Failed to patch machine %q: %v", s.machine.GetName(), err)
-		return err
+		e1 := fmt.Errorf("Failed to patch machine %q: %v", s.machine.GetName(), err)
+		klog.Error(e1.Error())
+		return e1
 	}
 
 	s.machine.Status = statusCopy
 
 	// patch status
 	if err := s.client.Status().Patch(context.Background(), s.machine, s.machineToBePatched); err != nil {
-		klog.Errorf("Failed to patch machine status %q: %v", s.machine.GetName(), err)
-		return err
+		e1 := fmt.Errorf("Failed to patch machine status %q: %v", s.machine.GetName(), err)
+		klog.Error(e1.Error())
+		return e1
 	}
 
 	return nil

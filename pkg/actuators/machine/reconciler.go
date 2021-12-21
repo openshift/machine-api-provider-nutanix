@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	nutanixClientV3 "github.com/nutanix-core/cluster-api-nutanix-go-client/pkg/nutanix/v3"
-	nutanixv1 "github.com/nutanix-core/cluster-api-openshift-mapi-provider-nutanix/pkg/apis/nutanixprovider/v1beta1"
 	configv1 "github.com/openshift/api/config/v1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/openshift/machine-api-operator/pkg/metrics"
@@ -13,6 +11,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	nutanixv1 "github.com/nutanix-cloud-native/machine-api-provider-nutanix/pkg/apis/nutanixprovider/v1beta1"
+	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix/v3"
 )
 
 const (

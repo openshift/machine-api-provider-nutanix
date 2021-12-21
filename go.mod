@@ -1,4 +1,4 @@
-module github.com/nutanix-core/cluster-api-openshift-mapi-provider-nutanix
+module github.com/nutanix-cloud-native/machine-api-provider-nutanix
 
 go 1.17
 
@@ -6,7 +6,7 @@ require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/go-logr/logr v0.4.0
 	github.com/golang/mock v1.5.0
-	github.com/nutanix-core/cluster-api-nutanix-go-client v0.0.0-00010101000000-000000000000
+	github.com/nutanix-cloud-native/prism-go-client v0.0.0-20211220162817-689f23de3cdc
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.14.0
 	github.com/openshift/api v0.0.0-20211122143513-bc2d3cf62e4c
@@ -108,8 +108,6 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.2 // indirect
 )
 
-replace (
-	github.com/nutanix-core/cluster-api-nutanix-go-client => ../cluster-api-nutanix-go-client
-	github.com/openshift/api => ../cluster-api-openshift-api
-	github.com/openshift/machine-api-operator => ../../openshift/machine-api-operator
-)
+//replace github.com/nutanix-cloud-native/prism-go-client => ../prism-go-client
+//replace github.com/openshift/api => ../../nutanix-core/cluster-api-openshift-api
+//replace github.com/openshift/machine-api-operator => ../../openshift/machine-api-operator

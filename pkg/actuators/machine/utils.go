@@ -3,10 +3,11 @@ package machine
 import (
 	corev1 "k8s.io/api/core/v1"
 	//"k8s.io/klog/v2"
-	nutanixv1 "github.com/nutanix-core/cluster-api-openshift-mapi-provider-nutanix/pkg/apis/nutanixprovider/v1beta1"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	nutanixv1 "github.com/nutanix-cloud-native/machine-api-provider-nutanix/pkg/apis/nutanixprovider/v1beta1"
 )
 
 // upstreamMachineClusterIDLabel is the label that a machine must have to identify the cluster to which it belongs

@@ -2,12 +2,11 @@ package machine
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"testing"
 	"time"
 
-	nutanixv1 "github.com/nutanix-core/cluster-api-openshift-mapi-provider-nutanix/pkg/apis/nutanixprovider/v1beta1"
-	clientpkg "github.com/nutanix-core/cluster-api-openshift-mapi-provider-nutanix/pkg/client"
 	. "github.com/onsi/gomega"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
@@ -17,6 +16,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	nutanixv1 "github.com/nutanix-cloud-native/machine-api-provider-nutanix/pkg/apis/nutanixprovider/v1beta1"
+	clientpkg "github.com/nutanix-cloud-native/machine-api-provider-nutanix/pkg/client"
 )
 
 func init() {
@@ -41,16 +43,25 @@ func TestMachineEvents(t *testing.T) {
 		g.Expect(k8sClient.Delete(ctx, testNs)).To(Succeed())
 	}()
 
+	endpoint, err := base64.StdEncoding.DecodeString("MTAuNDAuMTQyLjE1")
+	g.Expect(err).ToNot(HaveOccurred())
+	port, err := base64.StdEncoding.DecodeString("OTQ0MA==")
+	g.Expect(err).ToNot(HaveOccurred())
+	user, err := base64.StdEncoding.DecodeString("YWRtaW4=")
+	g.Expect(err).ToNot(HaveOccurred())
+	password, err := base64.StdEncoding.DecodeString("TnV0YW5peC4xMjM=")
+	g.Expect(err).ToNot(HaveOccurred())
+
 	credsSecret := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      defaultNutanixCredsSecretName,
 			Namespace: testNsName,
 		},
 		Data: map[string][]byte{
-			clientpkg.NutanixEndpointKey: []byte("10.40.142.15"),
-			clientpkg.NutanixPortKey:     []byte("9440"),
-			clientpkg.NutanixUserKey:     []byte("admin"),
-			clientpkg.NutanixPasswordKey: []byte("Nutanix.123"),
+			clientpkg.NutanixEndpointKey: endpoint,
+			clientpkg.NutanixPortKey:     port,
+			clientpkg.NutanixUserKey:     user,
+			clientpkg.NutanixPasswordKey: password,
 		},
 	}
 	g.Expect(k8sClient.Create(ctx, &credsSecret)).To(Succeed())
@@ -193,14 +204,12 @@ func TestMachineEvents(t *testing.T) {
 			providerSpec, err := nutanixv1.RawExtensionFromProviderSpec(&nutanixv1.NutanixMachineProviderConfig{
 				ClusterReferenceUuid: "0005b0f1-8f43-a0f2-02b7-3cecef193712",
 				ImageName:            "rhcos-4.10-openstack",
-				//ImageUUID:            "dc7f2b5c-fa95-4a5b-ac57-3882b1132c72", //rhcos-4.10-openstack
-				//ImageUUID:         "08dc3a35-83b8-4987-8f97-2480ab70c294", //test-capi2.qcow2
-				SubnetUUID:        "c7938dc6-7659-453e-a688-e26020c68e43",
-				NumVcpusPerSocket: 2,
-				NumSockets:        1,
-				MemorySizeMib:     4096,
-				DiskSizeMib:       122880,
-				PowerState:        "ON",
+				SubnetUUID:           "c7938dc6-7659-453e-a688-e26020c68e43",
+				NumVcpusPerSocket:    2,
+				NumSockets:           1,
+				MemorySizeMib:        4096,
+				DiskSizeMib:          122880,
+				PowerState:           "ON",
 				UserDataSecret: &corev1.LocalObjectReference{
 					Name: userDataSecretName,
 				},
