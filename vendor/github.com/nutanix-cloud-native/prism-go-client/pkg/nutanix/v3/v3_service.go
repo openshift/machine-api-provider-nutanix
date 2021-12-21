@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"os"
 
-	client "github.com/nutanix-core/cluster-api-nutanix-go-client/pkg/nutanix"
-	"github.com/nutanix-core/cluster-api-nutanix-go-client/pkg/utils"
+	client "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix"
+	"github.com/nutanix-cloud-native/prism-go-client/pkg/utils"
 )
 
 // Operations ...
