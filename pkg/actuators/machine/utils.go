@@ -1,10 +1,9 @@
 package machine
 
 import (
-	corev1 "k8s.io/api/core/v1"
-	//"k8s.io/klog/v2"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	nutanixv1 "github.com/nutanix-cloud-native/machine-api-provider-nutanix/pkg/apis/nutanixprovider/v1beta1"
@@ -119,7 +118,6 @@ func validateMachine(machine machinev1.Machine) error {
 // getClusterID get cluster ID by machine.openshift.io/cluster-api-cluster label
 func getClusterID(machine *machinev1.Machine) (string, bool) {
 	clusterID, ok := machine.Labels[machinev1.MachineClusterIDLabel]
-	// NOTE: This block can be removed after the label renaming transition to machine.openshift.io
 	if !ok {
 		clusterID, ok = machine.Labels[upstreamMachineClusterIDLabel]
 	}

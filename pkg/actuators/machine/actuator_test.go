@@ -202,7 +202,7 @@ func TestMachineEvents(t *testing.T) {
 			gs := NewWithT(t)
 
 			providerSpec, err := nutanixv1.RawExtensionFromProviderSpec(&nutanixv1.NutanixMachineProviderConfig{
-				ClusterReferenceUuid: "0005b0f1-8f43-a0f2-02b7-3cecef193712",
+				ClusterReferenceUUID: "0005b0f1-8f43-a0f2-02b7-3cecef193712",
 				ImageName:            "rhcos-4.10-openstack",
 				SubnetUUID:           "c7938dc6-7659-453e-a688-e26020c68e43",
 				NumVcpusPerSocket:    2,

@@ -22,6 +22,7 @@ const (
 	masterLabel              = "node-role.kubernetes.io/master"
 
 	providerIDFmt = "nutanix://%s"
+	infraName     = "cluster"
 )
 
 // Reconciler runs the logic to reconciles a machine resource towards its desired state
@@ -51,7 +52,7 @@ func (r *Reconciler) create() error {
 	}
 
 	infra := &configv1.Infrastructure{}
-	infraName := client.ObjectKey{Name: "cluster"}
+	infraName := client.ObjectKey{Name: infraName}
 
 	if err := r.client.Get(r.Context, infraName, infra); err != nil {
 		klog.Errorf("error reconciling create machine %s: failed to get Infrastructure %s. %v",
@@ -201,7 +202,7 @@ func (r *Reconciler) exists() (bool, error) {
 	}
 
 	if r.providerStatus.VmUUID != nil {
-		// Try to find the vm by name
+		// Try to find the vm by uuid
 		vmUuid := *r.providerStatus.VmUUID
 		_, err = findVMByUUID(r.nutanixClient, vmUuid)
 	} else {

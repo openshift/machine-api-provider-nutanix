@@ -45,12 +45,6 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 				Kind: utils.StringPtr("subnet"),
 			}}
 		nicList := []*nutanixClientV3.VMNic{vmNic}
-		// If this is controlplane node Machine, use the cluster's spec.controlPlaneEndpoint host IP to create VM
-		/*if nctx.IsControlPlaneMachine(rctx.NutanixMachine) {
-			vmNic.IPEndpointList = []*nutanixClientV3.IPAddress{&nutanixClientV3.IPAddress{
-				//Type: utils.StringPtr("ASSIGNED"),
-				IP: utils.StringPtr(rctx.NutanixCluster.Spec.ControlPlaneEndpoint.Host)}}
-		}*/
 
 		var imageUuidPtr *string
 		if len(mscp.providerSpec.ImageUUID) > 0 {
@@ -88,7 +82,7 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 		}
 		vmSpec.ClusterReference = &nutanixClientV3.Reference{
 			Kind: utils.StringPtr("cluster"),
-			UUID: utils.StringPtr(mscp.providerSpec.ClusterReferenceUuid),
+			UUID: utils.StringPtr(mscp.providerSpec.ClusterReferenceUUID),
 		}
 		vmInput.Spec = &vmSpec
 		vmInput.Metadata = &vmMetadata
@@ -143,19 +137,19 @@ func findVMByName(ntnxclient *nutanixClientV3.Client, vmName string) (*nutanixCl
 		Filter: utils.StringPtr(fmt.Sprintf("vm_name==%s", vmName))})
 
 	if err != nil {
-		err1 := fmt.Errorf("Error when finding VM by name %s. error: %v", vmName, err)
-		klog.Errorf(err1.Error())
-		return nil, err1
+		err = fmt.Errorf("Error when finding VM by name %s. error: %v", vmName, err)
+		klog.Errorf(err.Error())
+		return nil, err
 	}
 	if len(res.Entities) == 0 {
-		err2 := fmt.Errorf("Not Found VM by name %s. error: %v", vmName, err)
-		klog.Errorf(err2.Error())
-		return nil, err2
+		err = fmt.Errorf("Not Found VM by name %s. error: %v", vmName, err)
+		klog.Errorf(err.Error())
+		return nil, err
 	}
 	if len(res.Entities) > 1 {
-		err3 := fmt.Errorf("Found more than one (%v) vms with name %s.", len(res.Entities), vmName)
-		klog.Errorf(err3.Error())
-		return nil, err3
+		err = fmt.Errorf("Found more than one (%v) vms with name %s.", len(res.Entities), vmName)
+		klog.Errorf(err.Error())
+		return nil, err
 	}
 
 	vm := res.Entities[0]

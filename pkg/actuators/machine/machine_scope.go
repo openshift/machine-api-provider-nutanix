@@ -118,7 +118,7 @@ func (s *machineScope) getNutanixCredentials() {
 
 // Patch patches the machine spec and machine status after reconciling.
 func (s *machineScope) patchMachine() error {
-	klog.V(3).Infof("%v: patching machine", s.machine.GetName())
+	klog.V(3).Infof("%s: patching machine", s.machine.GetName())
 
 	providerStatus, err := nutanixv1.RawExtensionFromProviderStatus(s.providerStatus)
 	if err != nil {
@@ -129,7 +129,7 @@ func (s *machineScope) patchMachine() error {
 	statusCopy := *s.machine.Status.DeepCopy()
 
 	// patch machine
-	if err := s.client.Patch(context.Background(), s.machine, s.machineToBePatched); err != nil {
+	if err := s.client.Patch(s.Context, s.machine, s.machineToBePatched); err != nil {
 		e1 := fmt.Errorf("Failed to patch machine %q: %v", s.machine.GetName(), err)
 		klog.Error(e1.Error())
 		return e1
@@ -241,25 +241,6 @@ func (s *machineScope) getNode() (*corev1.Node, error) {
 	}
 
 	return &node, nil
-}
-
-func (s *machineScope) checkNodeReachable() (bool, error) {
-	node, err := s.getNode()
-	if err != nil {
-		// do not return error if node object not found, treat it as unreachable
-		if apimachineryerrors.IsNotFound(err) {
-			return false, nil
-		}
-		return false, err
-	}
-
-	for _, condition := range node.Status.Conditions {
-		if condition.Type == corev1.NodeReady && condition.Status == corev1.ConditionUnknown {
-			return false, nil
-		}
-	}
-
-	return true, nil
 }
 
 // nodeHasVolumesAttached returns true if node status still have volumes attached

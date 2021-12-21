@@ -33,7 +33,7 @@ type NutanixMachineProviderConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	ClusterReferenceUuid string `json:"clusterReferenceUuid,omitempty"`
+	ClusterReferenceUUID string `json:"clusterReferenceUuid,omitempty"`
 	ImageUUID            string `json:"imageUuid,omitempty"`
 	ImageName            string `json:"imageName,omitempty"`
 	SubnetUUID           string `json:"subnetUuid,omitempty"`
