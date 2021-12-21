@@ -44,7 +44,7 @@ import (
 // The default durations for the leader electrion operations.
 var (
 	leaseDuration = 120 * time.Second
-	renewDealine  = 110 * time.Second
+	renewDeadline = 110 * time.Second
 	retryPeriod   = 20 * time.Second
 )
 
@@ -118,7 +118,7 @@ func main() {
 		MetricsBindAddress:      *metricsAddress,
 		// Slow the default retry and renew election rate to reduce etcd writes at idle: BZ 1858400
 		RetryPeriod:   &retryPeriod,
-		RenewDeadline: &renewDealine,
+		RenewDeadline: &renewDeadline,
 	}
 
 	if *watchNamespace != "" {
