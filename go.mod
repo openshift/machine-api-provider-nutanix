@@ -108,6 +108,6 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.2 // indirect
 )
 
-//replace github.com/nutanix-cloud-native/prism-go-client => ../prism-go-client
-//replace github.com/openshift/api => ../../nutanix-core/cluster-api-openshift-api
-//replace github.com/openshift/machine-api-operator => ../../openshift/machine-api-operator
+replace github.com/nutanix-cloud-native/prism-go-client => ../prism-go-client
+replace github.com/openshift/api => ../../nutanix-core/cluster-api-openshift-api
+replace github.com/openshift/machine-api-operator => ../../openshift/machine-api-operator
