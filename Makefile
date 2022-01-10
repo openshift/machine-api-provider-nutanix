@@ -60,7 +60,7 @@ ifeq ($(NO_DOCKER), 1)
   DOCKER_CMD =
   IMAGE_BUILD_CMD = imagebuilder
 else
-  DOCKER_CMD = $(ENGINE) run --rm -e CGO_ENABLED=$(CGO_ENABLED) -e GOARCH=$(GOARCH) -e GOOS=$(GOOS) -v "$(PWD)":/go/src/github.com/nutanix-core/cluster-api-openshift-mapi-provider-nutanix:Z -w /go/src/github.com/nutanix-core/cluster-api-openshift-mapi-provider-nutanix openshift/origin-release:golang-1.16
+  DOCKER_CMD = $(ENGINE) run --rm -e CGO_ENABLED=$(CGO_ENABLED) -e GOARCH=$(GOARCH) -e GOOS=$(GOOS) -v "$(PWD)":/go/src/github.com/nutanix-cloud-native/machine-api-provider-nutanix:Z -w /go/src/github.com/nutanix-cloud-native/machine-api-provider-nutanix openshift/origin-release:golang-1.16
   IMAGE_BUILD_CMD = $(ENGINE) build
 endif
 
@@ -111,7 +111,7 @@ test-e2e: ## Run e2e tests
 
 .PHONY: lint
 lint: ## Go lint your code
-	$(DOCKER_CMD) hack/go-lint.sh -min_confidence 0.3 $$(go list -f '{{ .ImportPath }}' ./... | grep -v -e 'github.com/nutanix-core/cluster-api-openshift-mapi-provider-nutanix/test' -e 'github.com/nutanix-core/cluster-api-openshift-mapi-provider-nutanix/pkg/cloud/aws/client/mock')
+	$(DOCKER_CMD) hack/go-lint.sh -min_confidence 0.3 $$(go list -f '{{ .ImportPath }}' ./... | grep -v -e 'github.com/nutanix-cloud-native/machine-api-provider-nutanix/test' -e 'github.com/nutanix-cloud-native/machine-api-provider-nutanix/pkg/cloud/aws/client/mock')
 
 .PHONY: fmt
 fmt: ## Go fmt your code
