@@ -19,10 +19,6 @@ import (
 	"os"
 	"time"
 
-	configv1 "github.com/openshift/api/config/v1"
-	mapiv1 "github.com/openshift/api/machine/v1beta1"
-	"github.com/openshift/machine-api-operator/pkg/controller/machine"
-	"github.com/openshift/machine-api-operator/pkg/metrics"
 	corev1 "k8s.io/api/core/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/klog/v2"
@@ -36,9 +32,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	machineactuator "github.com/nutanix-cloud-native/machine-api-provider-nutanix/pkg/actuators/machine"
-	machinesetcontroller "github.com/nutanix-cloud-native/machine-api-provider-nutanix/pkg/actuators/machineset"
-	"github.com/nutanix-cloud-native/machine-api-provider-nutanix/pkg/version"
+	configv1 "github.com/openshift/api/config/v1"
+	mapiv1 "github.com/openshift/api/machine/v1beta1"
+	"github.com/openshift/machine-api-operator/pkg/controller/machine"
+	"github.com/openshift/machine-api-operator/pkg/metrics"
+	machineactuator "github.com/openshift/machine-api-provider-nutanix/pkg/actuators/machine"
+	machinesetcontroller "github.com/openshift/machine-api-provider-nutanix/pkg/actuators/machineset"
+	"github.com/openshift/machine-api-provider-nutanix/pkg/version"
 )
 
 // The default durations for the leader electrion operations.

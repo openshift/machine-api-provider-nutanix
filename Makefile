@@ -29,7 +29,7 @@ GOARCH  ?= $(shell go env GOARCH)
 GOOS    ?= $(shell go env GOOS)
 
 VERSION     ?= $(shell git describe --always --abbrev=7)
-REPO_PATH   ?= github.com/nutanix-cloud-native/machine-api-provider-nutanix
+REPO_PATH   ?= github.com/openshift/machine-api-provider-nutanix
 LD_FLAGS    ?= -X $(REPO_PATH)/pkg/version.Raw=$(VERSION) -extldflags "-static"
 MUTABLE_TAG ?= latest
 IMAGE        = public.ecr.aws/g7v6l0u0/openshift/mapi-provider-nutanix
@@ -60,7 +60,7 @@ ifeq ($(NO_DOCKER), 1)
   DOCKER_CMD =
   IMAGE_BUILD_CMD = imagebuilder
 else
-  DOCKER_CMD = $(ENGINE) run --rm -e CGO_ENABLED=$(CGO_ENABLED) -e GOARCH=$(GOARCH) -e GOOS=$(GOOS) -v "$(PWD)":/go/src/github.com/nutanix-cloud-native/machine-api-provider-nutanix:Z -w /go/src/github.com/nutanix-cloud-native/machine-api-provider-nutanix openshift/origin-release:golang-1.16
+  DOCKER_CMD = $(ENGINE) run --rm -e CGO_ENABLED=$(CGO_ENABLED) -e GOARCH=$(GOARCH) -e GOOS=$(GOOS) -v "$(PWD)":/go/src/github.com/openshift/machine-api-provider-nutanix:Z -w /go/src/github.com/openshift/machine-api-provider-nutanix openshift/origin-release:golang-1.16
   IMAGE_BUILD_CMD = $(ENGINE) build
 endif
 
@@ -91,7 +91,7 @@ images: ## Create images
 ifeq ($(NO_DOCKER), 1)
 	./hack/imagebuilder.sh
 endif
-	$(IMAGE_BUILD_CMD) -t "$(IMAGE):$(VERSION)" -t "$(IMAGE):$(MUTABLE_TAG)" -f package/docker/Dockerfile ./
+	$(IMAGE_BUILD_CMD) -t "$(IMAGE):$(VERSION)" -t "$(IMAGE):$(MUTABLE_TAG)" -f Dockerfile ./
 
 .PHONY: push
 push:
@@ -111,7 +111,7 @@ test-e2e: ## Run e2e tests
 
 .PHONY: lint
 lint: ## Go lint your code
-	$(DOCKER_CMD) hack/go-lint.sh -min_confidence 0.3 $$(go list -f '{{ .ImportPath }}' ./... | grep -v -e 'github.com/nutanix-cloud-native/machine-api-provider-nutanix/test' -e 'github.com/nutanix-cloud-native/machine-api-provider-nutanix/pkg/cloud/aws/client/mock')
+	$(DOCKER_CMD) hack/go-lint.sh -min_confidence 0.3 $$(go list -f '{{ .ImportPath }}' ./... | grep -v -e 'github.com/openshift/machine-api-provider-nutanix/test' -e 'github.com/openshift/machine-api-provider-nutanix/pkg/cloud/aws/client/mock')
 
 .PHONY: fmt
 fmt: ## Go fmt your code
