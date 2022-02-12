@@ -47,8 +47,6 @@ type machineScope struct {
 	machineToBePatched runtimeclient.Patch
 	providerSpec       *nutanixv1.NutanixMachineProviderConfig
 	providerStatus     *nutanixv1.NutanixMachineProviderStatus
-	// is for unit test
-	isUnitTest bool
 }
 
 func newMachineScope(params machineScopeParams) (*machineScope, error) {
