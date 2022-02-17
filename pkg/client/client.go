@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/klog/v2"
-
 	nutanixClient "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix"
 	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix/v3"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -48,7 +47,7 @@ func Client(options ClientOptions) (*nutanixClientV3.Client, error) {
 		Insecure: true,
 	}
 
-	klog.Infof("To create nutanixClient with creds: %+v", cred)
+	klog.Infof("To create nutanixClient with url: %s", cred.URL)
 	cli, err := nutanixClientV3.NewV3Client(cred, options.Debug)
 	if err != nil {
 		klog.Errorf("Failed to create the nutanix client. error: %v", err)

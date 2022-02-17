@@ -5,25 +5,22 @@ import (
 	"fmt"
 	"os"
 
-	machinev1 "github.com/openshift/api/machine/v1beta1"
-	machineapierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
+	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix/v3"
 	corev1 "k8s.io/api/core/v1"
 	apimachineryerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog/v2"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	nutanixv1 "github.com/nutanix-cloud-native/machine-api-provider-nutanix/pkg/apis/nutanixprovider/v1beta1"
-	clientpkg "github.com/nutanix-cloud-native/machine-api-provider-nutanix/pkg/client"
-	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix/v3"
+	machinev1 "github.com/openshift/api/machine/v1beta1"
+	machineapierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
+	nutanixv1 "github.com/openshift/machine-api-provider-nutanix/pkg/apis/nutanixprovider/v1beta1"
+	clientpkg "github.com/openshift/machine-api-provider-nutanix/pkg/client"
 )
 
 const (
 	defaultNutanixCredsSecretName = "nutanix-creds-secret"
 	userDataSecretKey             = "userData"
 )
-
-// dhcpDomainKeyName is a variable so we can reference it in unit tests.
-var dhcpDomainKeyName = "domain-name"
 
 // machineScopeParams defines the input parameters used to create a new MachineScope.
 type machineScopeParams struct {

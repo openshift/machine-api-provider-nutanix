@@ -17,7 +17,7 @@ limitations under the License.
 package apis
 
 import (
-	"github.com/nutanix-cloud-native/machine-api-provider-nutanix/pkg/apis/nutanixprovider/v1beta1"
+	"github.com/openshift/machine-api-provider-nutanix/pkg/apis/nutanixprovider/v1beta1"
 )
 
 func init() {
