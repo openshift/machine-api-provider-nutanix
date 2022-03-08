@@ -4,26 +4,34 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	configv1 "github.com/openshift/api/config/v1"
-	machinev1 "github.com/openshift/api/machine/v1beta1"
-	nutanixv1 "github.com/openshift/machine-api-provider-nutanix/pkg/apis/nutanixprovider/v1beta1"
+	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1b1 "github.com/openshift/api/machine/v1beta1"
 	clientpkg "github.com/openshift/machine-api-provider-nutanix/pkg/client"
+)
+
+const (
+	// NutanixCredentialsSecretName is the name of the secret holding the credentials for PC client
+	NutanixCredentialsSecretName = "nutanix-credentials"
 )
 
 func init() {
 	// Add types to scheme
-	machinev1.AddToScheme(scheme.Scheme)
+	machinev1b1.AddToScheme(scheme.Scheme)
+	machinev1.Install(scheme.Scheme)
 	configv1.AddToScheme(scheme.Scheme)
 }
 
@@ -31,6 +39,44 @@ func TestMachineEvents(t *testing.T) {
 
 	g := NewWithT(t)
 	ctx := context.Background()
+
+	// Create the Infrastructure CR
+	infra := &configv1.Infrastructure{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: globalInfrastuctureName,
+		},
+		Spec: configv1.InfrastructureSpec{
+			CloudConfig: configv1.ConfigMapFileReference{},
+			PlatformSpec: configv1.PlatformSpec{
+				Type: configv1.NutanixPlatformType,
+				Nutanix: &configv1.NutanixPlatformSpec{
+					PCEndpoint: "10.40.142.15",
+					PCPort:     "9440",
+				},
+			},
+		},
+	}
+
+	g.Expect(k8sClient.Create(ctx, infra)).To(Succeed())
+	defer func() {
+		g.Expect(k8sClient.Delete(ctx, infra)).To(Succeed())
+	}()
+	g.Expect(strings.EqualFold(infra.Spec.PlatformSpec.Nutanix.PCEndpoint, "10.40.142.15")).Should(BeTrue())
+	g.Expect(strings.EqualFold(infra.Spec.PlatformSpec.Nutanix.PCPort, "9440")).Should(BeTrue())
+
+	// Update the infrastructure status
+	infra.Status.InfrastructureName = "test-cluster-1"
+	infra.Status.Platform = configv1.NutanixPlatformType
+	infra.Status.ControlPlaneTopology = configv1.HighlyAvailableTopologyMode
+	infra.Status.InfrastructureTopology = configv1.SingleReplicaTopologyMode
+	infra.Status.PlatformStatus = &configv1.PlatformStatus{
+		Type: configv1.NutanixPlatformType,
+		Nutanix: &configv1.NutanixPlatformStatus{
+			APIServerInternalIP: "10.40.142.5",
+			IngressIP:           "10.40.142.6",
+		},
+	}
+	g.Expect(k8sClient.Status().Update(ctx, infra)).To(Succeed())
 
 	testNsName := "test"
 	testNs := &corev1.Namespace{
@@ -43,10 +89,6 @@ func TestMachineEvents(t *testing.T) {
 		g.Expect(k8sClient.Delete(ctx, testNs)).To(Succeed())
 	}()
 
-	endpoint, err := base64.StdEncoding.DecodeString("MTAuNDAuMTQyLjE1")
-	g.Expect(err).ToNot(HaveOccurred())
-	port, err := base64.StdEncoding.DecodeString("OTQ0MA==")
-	g.Expect(err).ToNot(HaveOccurred())
 	user, err := base64.StdEncoding.DecodeString("YWRtaW4=")
 	g.Expect(err).ToNot(HaveOccurred())
 	password, err := base64.StdEncoding.DecodeString("TnV0YW5peC4xMjM=")
@@ -54,12 +96,10 @@ func TestMachineEvents(t *testing.T) {
 
 	credsSecret := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      defaultNutanixCredsSecretName,
+			Name:      NutanixCredentialsSecretName,
 			Namespace: testNsName,
 		},
 		Data: map[string][]byte{
-			clientpkg.NutanixEndpointKey: endpoint,
-			clientpkg.NutanixPortKey:     port,
 			clientpkg.NutanixUserKey:     user,
 			clientpkg.NutanixPasswordKey: password,
 		},
@@ -67,22 +107,6 @@ func TestMachineEvents(t *testing.T) {
 	g.Expect(k8sClient.Create(ctx, &credsSecret)).To(Succeed())
 	defer func() {
 		g.Expect(k8sClient.Delete(ctx, &credsSecret)).To(Succeed())
-	}()
-
-	infra := &configv1.Infrastructure{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: globalInfrastuctureName,
-		},
-		Spec: configv1.InfrastructureSpec{
-			PlatformSpec: configv1.PlatformSpec{
-				Type:      configv1.BareMetalPlatformType,
-				BareMetal: &configv1.BareMetalPlatformSpec{},
-			},
-		},
-	}
-	g.Expect(k8sClient.Create(ctx, infra)).To(Succeed())
-	defer func() {
-		g.Expect(k8sClient.Delete(ctx, infra)).To(Succeed())
 	}()
 
 	userDataSecretName := "nutanix-userdata"
@@ -105,13 +129,13 @@ func TestMachineEvents(t *testing.T) {
 		name        string
 		machineName string
 		error       string
-		operation   func(actuator *Actuator, machine *machinev1.Machine)
+		operation   func(actuator *Actuator, machine *machinev1b1.Machine)
 		event       string
 	}{
 		{
 			name:        "Create machine failed on invalid machine scope",
 			machineName: "test-machine",
-			operation: func(actuator *Actuator, machine *machinev1.Machine) {
+			operation: func(actuator *Actuator, machine *machinev1b1.Machine) {
 				actuator.Create(nil, machine)
 			},
 			event: "context and machine should not be nil",
@@ -119,8 +143,8 @@ func TestMachineEvents(t *testing.T) {
 		{
 			name:        "Create machine failed on missing required label",
 			machineName: "test-machine",
-			operation: func(actuator *Actuator, machine *machinev1.Machine) {
-				machine.Labels[machinev1.MachineClusterIDLabel] = ""
+			operation: func(actuator *Actuator, machine *machinev1b1.Machine) {
+				machine.Labels[machinev1b1.MachineClusterIDLabel] = ""
 				actuator.Create(ctx, machine)
 			},
 			event: "missing \"machine.openshift.io/cluster-api-cluster\" label",
@@ -128,9 +152,9 @@ func TestMachineEvents(t *testing.T) {
 		/*{
 			name:        "Create machine succeed",
 			machineName: "test-machine",
-			operation: func(actuator *Actuator, machine *machinev1.Machine) {
+			operation: func(actuator *Actuator, machine *machinev1b1.Machine) {
 				actuator.Create(ctx, machine)
-				providerStatus, err1 := nutanixv1.ProviderStatusFromRawExtension(machine.Status.ProviderStatus)
+				providerStatus, err1 := NutanixMachineProviderStatusFromRawExtension(machine.Status.ProviderStatus)
 				g.Expect(err1).ToNot(HaveOccurred())
 				vmUuid = providerStatus.VmUUID
 				g.Expect(vmUuid).NotTo(BeNil())
@@ -142,7 +166,7 @@ func TestMachineEvents(t *testing.T) {
 		{
 			name:        "Update machine failed on invalid machine scope",
 			machineName: "test-machine",
-			operation: func(actuator *Actuator, machine *machinev1.Machine) {
+			operation: func(actuator *Actuator, machine *machinev1b1.Machine) {
 				actuator.Update(nil, machine)
 			},
 			event: "context and machine should not be nil",
@@ -150,8 +174,8 @@ func TestMachineEvents(t *testing.T) {
 		{
 			name:        "Update failed on missing required label",
 			machineName: "test-machine",
-			operation: func(actuator *Actuator, machine *machinev1.Machine) {
-				machine.Labels[machinev1.MachineClusterIDLabel] = ""
+			operation: func(actuator *Actuator, machine *machinev1b1.Machine) {
+				machine.Labels[machinev1b1.MachineClusterIDLabel] = ""
 				actuator.Update(ctx, machine)
 			},
 			event: "missing \"machine.openshift.io/cluster-api-cluster\" label",
@@ -159,12 +183,12 @@ func TestMachineEvents(t *testing.T) {
 		/*{
 			name:        "Update machine succeed",
 			machineName: "test-machine",
-			operation: func(actuator *Actuator, machine *machinev1.Machine) {
+			operation: func(actuator *Actuator, machine *machinev1b1.Machine) {
 				g.Expect(vmUuid).NotTo(BeNil())
-				providerStatus, err1 := nutanixv1.ProviderStatusFromRawExtension(machine.Status.ProviderStatus)
+				providerStatus, err1 := NutanixMachineProviderStatusFromRawExtension(machine.Status.ProviderStatus)
 				g.Expect(err1).ToNot(HaveOccurred())
 				providerStatus.VmUUID = vmUuid
-				rawProviderStatus, err1 := nutanixv1.RawExtensionFromProviderStatus(providerStatus)
+				rawProviderStatus, err1 := RawExtensionFromNutanixMachineProviderStatus(providerStatus)
 				g.Expect(err1).ToNot(HaveOccurred())
 				machine.Status.ProviderStatus = rawProviderStatus
 				actuator.Update(ctx, machine)
@@ -174,7 +198,7 @@ func TestMachineEvents(t *testing.T) {
 		{
 			name:        "Delete machine event failed on invalid machine scope",
 			machineName: "test-machine",
-			operation: func(actuator *Actuator, machine *machinev1.Machine) {
+			operation: func(actuator *Actuator, machine *machinev1b1.Machine) {
 				actuator.Delete(nil, machine)
 			},
 			event: "context and machine should not be nil",
@@ -182,12 +206,12 @@ func TestMachineEvents(t *testing.T) {
 		/*{
 			name:        "Delete machine succeed",
 			machineName: "test-machine",
-			operation: func(actuator *Actuator, machine *machinev1.Machine) {
+			operation: func(actuator *Actuator, machine *machinev1b1.Machine) {
 				g.Expect(vmUuid).NotTo(BeNil())
-				providerStatus, err1 := nutanixv1.ProviderStatusFromRawExtension(machine.Status.ProviderStatus)
+				providerStatus, err1 := NutanixMachineProviderStatusFromRawExtension(machine.Status.ProviderStatus)
 				g.Expect(err1).ToNot(HaveOccurred())
 				providerStatus.VmUUID = vmUuid
-				rawProviderStatus, err1 := nutanixv1.RawExtensionFromProviderStatus(providerStatus)
+				rawProviderStatus, err1 := RawExtensionFromNutanixMachineProviderStatus(providerStatus)
 				g.Expect(err1).ToNot(HaveOccurred())
 				machine.Status.ProviderStatus = rawProviderStatus
 				actuator.Delete(ctx, machine)
@@ -201,35 +225,41 @@ func TestMachineEvents(t *testing.T) {
 			timeout := 30 * time.Second
 			gs := NewWithT(t)
 
-			providerSpec, err := nutanixv1.RawExtensionFromProviderSpec(&nutanixv1.NutanixMachineProviderConfig{
-				ClusterReferenceUUID: "0005b0f1-8f43-a0f2-02b7-3cecef193712",
-				ImageName:            "rhcos-4.10-openstack",
-				SubnetUUID:           "c7938dc6-7659-453e-a688-e26020c68e43",
-				NumVcpusPerSocket:    2,
-				NumSockets:           1,
-				MemorySizeMib:        4096,
-				DiskSizeMib:          122880,
-				PowerState:           "ON",
+			memSizeQuantity, err := resource.ParseQuantity("4096Mi")
+			g.Expect(err).ToNot(HaveOccurred())
+			diskSizeQuantity, err := resource.ParseQuantity("120Gi")
+			g.Expect(err).ToNot(HaveOccurred())
+			providerSpec, err := RawExtensionFromNutanixMachineProviderSpec(&machinev1.NutanixMachineProviderConfig{
+				ClusterReference:  &machinev1.NutanixReference{Name: "ganon"},              //UUID: "0005b0f1-8f43-a0f2-02b7-3cecef193712"
+				ImageReference:    &machinev1.NutanixReference{Name: "rhcos-4.10-nutanix"}, //UUID: "ca59d2b3-c148-4c4a-bf9d-082b9508cf69"
+				SubnetReference:   &machinev1.NutanixReference{Name: "sherlock_net"},       //UUID: "c7938dc6-7659-453e-a688-e26020c68e43"
+				NumVcpusPerSocket: 2,
+				NumSockets:        1,
+				MemorySize:        memSizeQuantity,
+				DiskSize:          diskSizeQuantity,
+				CredentialsSecret: &corev1.LocalObjectReference{
+					Name: NutanixCredentialsSecretName,
+				},
 				UserDataSecret: &corev1.LocalObjectReference{
 					Name: userDataSecretName,
 				},
 			})
 			gs.Expect(err).ToNot(HaveOccurred())
 
-			machine := &machinev1.Machine{
+			machine := &machinev1b1.Machine{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      tc.machineName,
 					Namespace: testNsName,
 					Labels: map[string]string{
-						machinev1.MachineClusterIDLabel: "CLUSTERID",
+						machinev1b1.MachineClusterIDLabel: "CLUSTERID",
 					},
 				},
-				Spec: machinev1.MachineSpec{
-					ProviderSpec: machinev1.ProviderSpec{
+				Spec: machinev1b1.MachineSpec{
+					ProviderSpec: machinev1b1.ProviderSpec{
 						Value: providerSpec,
 					},
 				},
-				Status: machinev1.MachineStatus{
+				Status: machinev1b1.MachineStatus{
 					NodeRef: &v1.ObjectReference{
 						Name: tc.machineName,
 					},
@@ -245,7 +275,7 @@ func TestMachineEvents(t *testing.T) {
 			// Ensure the machine has synced to the cache
 			getMachine := func() error {
 				machineKey := types.NamespacedName{Namespace: machine.Namespace, Name: machine.Name}
-				return k8sClient.Get(ctx, machineKey, &machinev1.Machine{})
+				return k8sClient.Get(ctx, machineKey, &machinev1b1.Machine{})
 			}
 			gs.Eventually(getMachine, timeout).Should(Succeed())
 
@@ -253,7 +283,7 @@ func TestMachineEvents(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: tc.machineName,
 					Labels: map[string]string{
-						machinev1.MachineClusterIDLabel: "CLUSTERID",
+						machinev1b1.MachineClusterIDLabel: "CLUSTERID",
 					},
 				},
 				Spec: v1.NodeSpec{},

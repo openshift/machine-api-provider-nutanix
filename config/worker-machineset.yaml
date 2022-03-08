@@ -23,7 +23,7 @@ spec:
           node-role.kubernetes.io/compute: ""
       providerSpec:
         value:
-          apiVersion: nutanixproviderconfig.openshift.io/v1beta1
+          apiVersion: machine.openshift.io/v1
           kind: NutanixMachineProviderConfig
           userDataSecret:
             name: worker-userdata-secret

@@ -33,7 +33,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	configv1 "github.com/openshift/api/config/v1"
-	mapiv1 "github.com/openshift/api/machine/v1beta1"
+	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1b1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/openshift/machine-api-operator/pkg/metrics"
 	machineactuator "github.com/openshift/machine-api-provider-nutanix/pkg/actuators/machine"
@@ -132,8 +133,12 @@ func main() {
 	}
 
 	// Setup Scheme for all resources
-	if err := mapiv1.AddToScheme(mgr.GetScheme()); err != nil {
+	if err := machinev1b1.AddToScheme(mgr.GetScheme()); err != nil {
 		klog.Fatalf("Error setting up scheme: %v", err)
+	}
+
+	if err := machinev1.Install(mgr.GetScheme()); err != nil {
+		klog.Fatal(err)
 	}
 
 	if err := configv1.AddToScheme(mgr.GetScheme()); err != nil {

@@ -36,21 +36,33 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 		userdataEncoded := base64.StdEncoding.EncodeToString(userData)
 
 		// Create the VM
-		klog.Infof("To create VM with name %s, and providerSpec: %+v", vmName, *mscp.providerSpec)
+		klog.Infof("To create VM with name %q, and providerSpec: %+v", vmName, *mscp.providerSpec)
 		vmInput := nutanixClientV3.VMIntentInput{}
 		vmSpec := nutanixClientV3.VM{Name: utils.StringPtr(vmName)}
+
+		// subnet
+		var subnetUuidPtr *string
+		if len(mscp.providerSpec.SubnetReference.UUID) > 0 {
+			subnetUuidPtr = utils.StringPtr(mscp.providerSpec.SubnetReference.UUID)
+		} else if len(mscp.providerSpec.SubnetReference.Name) > 0 {
+			subnetUuidPtr, err = findSubenetUuidByName(mscp.nutanixClient, mscp.providerSpec.SubnetReference.Name)
+			if err != nil {
+				return nil, err
+			}
+		}
 		vmNic := &nutanixClientV3.VMNic{
 			SubnetReference: &nutanixClientV3.Reference{
-				UUID: &mscp.providerSpec.SubnetUUID,
 				Kind: utils.StringPtr("subnet"),
+				UUID: subnetUuidPtr,
 			}}
 		nicList := []*nutanixClientV3.VMNic{vmNic}
 
+		// rhcos image system disk
 		var imageUuidPtr *string
-		if len(mscp.providerSpec.ImageUUID) > 0 {
-			imageUuidPtr = utils.StringPtr(mscp.providerSpec.ImageUUID)
-		} else if len(mscp.providerSpec.ImageName) > 0 {
-			imageUuidPtr, err = findImageUuidByName(mscp.nutanixClient, mscp.providerSpec.ImageName)
+		if len(mscp.providerSpec.ImageReference.UUID) > 0 {
+			imageUuidPtr = utils.StringPtr(mscp.providerSpec.ImageReference.UUID)
+		} else if len(mscp.providerSpec.ImageReference.Name) > 0 {
+			imageUuidPtr, err = findImageUuidByName(mscp.nutanixClient, mscp.providerSpec.ImageReference.Name)
 			if err != nil {
 				return nil, err
 			}
@@ -62,34 +74,46 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 				Kind: utils.StringPtr("image"),
 				UUID: imageUuidPtr,
 			},
-			DiskSizeMib: utils.Int64Ptr(mscp.providerSpec.DiskSizeMib),
+			DiskSizeMib: utils.Int64Ptr(GetMibValueOfQuality(mscp.providerSpec.DiskSize)),
 		})
+
 		vmMetadata := nutanixClientV3.Metadata{
 			Kind:        utils.StringPtr("vm"),
 			SpecVersion: utils.Int64Ptr(1),
 		}
 		vmSpec.Resources = &nutanixClientV3.VMResources{
-			PowerState:            utils.StringPtr(mscp.providerSpec.PowerState),
+			PowerState:            utils.StringPtr("ON"),
 			HardwareClockTimezone: utils.StringPtr("UTC"),
 			NumVcpusPerSocket:     utils.Int64Ptr(mscp.providerSpec.NumVcpusPerSocket),
 			NumSockets:            utils.Int64Ptr(mscp.providerSpec.NumSockets),
-			MemorySizeMib:         utils.Int64Ptr(mscp.providerSpec.MemorySizeMib),
+			MemorySizeMib:         utils.Int64Ptr(GetMibValueOfQuality(mscp.providerSpec.MemorySize)),
 			NicList:               nicList,
 			DiskList:              diskList,
 			GuestCustomization: &nutanixClientV3.GuestCustomization{
 				IsOverridable: utils.BoolPtr(true),
 				CloudInit:     &nutanixClientV3.GuestCustomizationCloudInit{UserData: utils.StringPtr(userdataEncoded)}},
 		}
+
+		// Set cluster/PE reference
+		var clusterRefUuidPtr *string
+		if len(mscp.providerSpec.ClusterReference.UUID) > 0 {
+			clusterRefUuidPtr = utils.StringPtr(mscp.providerSpec.ClusterReference.UUID)
+		} else if len(mscp.providerSpec.ClusterReference.Name) > 0 {
+			clusterRefUuidPtr, err = findClusterUuidByName(mscp.nutanixClient, mscp.providerSpec.ClusterReference.Name)
+			if err != nil {
+				return nil, err
+			}
+		}
 		vmSpec.ClusterReference = &nutanixClientV3.Reference{
 			Kind: utils.StringPtr("cluster"),
-			UUID: utils.StringPtr(mscp.providerSpec.ClusterReferenceUUID),
+			UUID: clusterRefUuidPtr,
 		}
+
 		vmInput.Spec = &vmSpec
 		vmInput.Metadata = &vmMetadata
-
 		vm, err = mscp.nutanixClient.V3.CreateVM(&vmInput)
 		if err != nil {
-			klog.Errorf("Failed to create VM %s. error: %v", vmName, err)
+			klog.Errorf("Failed to create VM %q. error: %v", vmName, err)
 			return nil, err
 		}
 		vmUuid = *vm.Metadata.UUID
@@ -185,21 +209,64 @@ func deleteVM(ntnxclient *nutanixClientV3.Client, vmUUID string) error {
 	return nil
 }
 
-// findImageByName retrieves the Image with the given vm name
+// findClusterUuidByName retrieves the cluster uuid by the given cluster name
+func findClusterUuidByName(ntnxclient *nutanixClientV3.Client, clusterName string) (*string, error) {
+	klog.Infof("Checking if cluster with name %q exists.", clusterName)
+
+	res, err := ntnxclient.V3.ListCluster(&nutanixClientV3.DSMetadata{
+		//Kind: utils.StringPtr("cluster"),
+		Filter: utils.StringPtr(fmt.Sprintf("name==%s", clusterName)),
+	})
+	if err != nil || len(res.Entities) == 0 {
+		e1 := fmt.Errorf("Failed to find cluster by name %q. error: %v", clusterName, err)
+		klog.Errorf(e1.Error())
+		return nil, e1
+	}
+
+	if len(res.Entities) > 1 {
+		klog.Warningf("Found more than one (%v) clusters with name %q.", len(res.Entities), clusterName)
+	}
+
+	return res.Entities[0].Metadata.UUID, nil
+}
+
+// findImageByName retrieves the image uuid by the given image name
 func findImageUuidByName(ntnxclient *nutanixClientV3.Client, imageName string) (*string, error) {
-	klog.Infof("Checking if Image with name %s exists.", imageName)
+	klog.Infof("Checking if image with name %q exists.", imageName)
 
 	res, err := ntnxclient.V3.ListImage(&nutanixClientV3.DSMetadata{
 		//Kind: utils.StringPtr("image"),
 		Filter: utils.StringPtr(fmt.Sprintf("name==%s", imageName)),
 	})
 	if err != nil || len(res.Entities) == 0 {
-		klog.Errorf("Failed to find image by name %s. error: %v", imageName, err)
-		return nil, fmt.Errorf("Failed to find image by name %s. error: %v", imageName, err)
+		e1 := fmt.Errorf("Failed to find image by name %q. error: %v", imageName, err)
+		klog.Errorf(e1.Error())
+		return nil, e1
 	}
 
 	if len(res.Entities) > 1 {
-		klog.Warningf("Found more than one (%v) images with name %s.", len(res.Entities), imageName)
+		klog.Warningf("Found more than one (%v) images with name %q.", len(res.Entities), imageName)
+	}
+
+	return res.Entities[0].Metadata.UUID, nil
+}
+
+// findSubenetUuidByName retrieves the subnet uuid by the given subnet name
+func findSubenetUuidByName(ntnxclient *nutanixClientV3.Client, subnetName string) (*string, error) {
+	klog.Infof("Checking if subnet with name %s exists.", subnetName)
+
+	res, err := ntnxclient.V3.ListSubnet(&nutanixClientV3.DSMetadata{
+		//Kind: utils.StringPtr("subnet"),
+		Filter: utils.StringPtr(fmt.Sprintf("name==%s", subnetName)),
+	})
+	if err != nil || len(res.Entities) == 0 {
+		e1 := fmt.Errorf("Failed to find subnet by name %q. error: %v", subnetName, err)
+		klog.Errorf(e1.Error())
+		return nil, e1
+	}
+
+	if len(res.Entities) > 1 {
+		klog.Warningf("Found more than one (%v) subnets with name %q.", len(res.Entities), subnetName)
 	}
 
 	return res.Entities[0].Metadata.UUID, nil
