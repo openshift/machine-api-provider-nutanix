@@ -42,10 +42,10 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 
 		// subnet
 		var subnetUuidPtr *string
-		if len(mscp.providerSpec.SubnetReference.UUID) > 0 {
-			subnetUuidPtr = utils.StringPtr(mscp.providerSpec.SubnetReference.UUID)
-		} else if len(mscp.providerSpec.SubnetReference.Name) > 0 {
-			subnetUuidPtr, err = findSubenetUuidByName(mscp.nutanixClient, mscp.providerSpec.SubnetReference.Name)
+		if mscp.providerSpec.Subnet.UUID != nil {
+			subnetUuidPtr = mscp.providerSpec.Subnet.UUID
+		} else if mscp.providerSpec.Subnet.Name != nil {
+			subnetUuidPtr, err = findSubenetUuidByName(mscp.nutanixClient, *mscp.providerSpec.Subnet.Name)
 			if err != nil {
 				return nil, err
 			}
@@ -59,10 +59,10 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 
 		// rhcos image system disk
 		var imageUuidPtr *string
-		if len(mscp.providerSpec.ImageReference.UUID) > 0 {
-			imageUuidPtr = utils.StringPtr(mscp.providerSpec.ImageReference.UUID)
-		} else if len(mscp.providerSpec.ImageReference.Name) > 0 {
-			imageUuidPtr, err = findImageUuidByName(mscp.nutanixClient, mscp.providerSpec.ImageReference.Name)
+		if mscp.providerSpec.Image.UUID != nil {
+			imageUuidPtr = mscp.providerSpec.Image.UUID
+		} else if mscp.providerSpec.Image.Name != nil {
+			imageUuidPtr, err = findImageUuidByName(mscp.nutanixClient, *mscp.providerSpec.Image.Name)
 			if err != nil {
 				return nil, err
 			}
@@ -74,7 +74,7 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 				Kind: utils.StringPtr("image"),
 				UUID: imageUuidPtr,
 			},
-			DiskSizeMib: utils.Int64Ptr(GetMibValueOfQuality(mscp.providerSpec.DiskSize)),
+			DiskSizeMib: utils.Int64Ptr(GetMibValueOfQuality(mscp.providerSpec.SystemDiskSize)),
 		})
 
 		vmMetadata := nutanixClientV3.Metadata{
@@ -84,8 +84,8 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 		vmSpec.Resources = &nutanixClientV3.VMResources{
 			PowerState:            utils.StringPtr("ON"),
 			HardwareClockTimezone: utils.StringPtr("UTC"),
-			NumVcpusPerSocket:     utils.Int64Ptr(mscp.providerSpec.NumVcpusPerSocket),
-			NumSockets:            utils.Int64Ptr(mscp.providerSpec.NumSockets),
+			NumVcpusPerSocket:     utils.Int64Ptr(int64(mscp.providerSpec.VcpusPerSocket)),
+			NumSockets:            utils.Int64Ptr(int64(mscp.providerSpec.VcpuSockets)),
 			MemorySizeMib:         utils.Int64Ptr(GetMibValueOfQuality(mscp.providerSpec.MemorySize)),
 			NicList:               nicList,
 			DiskList:              diskList,
@@ -96,10 +96,10 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 
 		// Set cluster/PE reference
 		var clusterRefUuidPtr *string
-		if len(mscp.providerSpec.ClusterReference.UUID) > 0 {
-			clusterRefUuidPtr = utils.StringPtr(mscp.providerSpec.ClusterReference.UUID)
-		} else if len(mscp.providerSpec.ClusterReference.Name) > 0 {
-			clusterRefUuidPtr, err = findClusterUuidByName(mscp.nutanixClient, mscp.providerSpec.ClusterReference.Name)
+		if mscp.providerSpec.Cluster.UUID != nil {
+			clusterRefUuidPtr = mscp.providerSpec.Cluster.UUID
+		} else if mscp.providerSpec.Cluster.Name != nil {
+			clusterRefUuidPtr, err = findClusterUuidByName(mscp.nutanixClient, *mscp.providerSpec.Cluster.Name)
 			if err != nil {
 				return nil, err
 			}

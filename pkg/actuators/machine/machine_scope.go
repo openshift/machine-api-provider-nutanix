@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
@@ -101,14 +102,16 @@ func (s *machineScope) getNutanixCredentials() error {
 	}
 
 	// Set the corresponding environment variable
-	if len(infra.Spec.PlatformSpec.Nutanix.PCEndpoint) == 0 {
-		return fmt.Errorf("The pcEndpoint field is not set in the Infrastreucture CR")
+	pcEndpoint := infra.Spec.PlatformSpec.Nutanix.PrismCentralEndpoint
+	pcPort := infra.Spec.PlatformSpec.Nutanix.PrismCentralPort
+	if len(pcEndpoint) == 0 {
+		return fmt.Errorf("The prismCentralEndpoint field is not set in the Infrastreucture CR")
 	}
-	os.Setenv(clientpkg.NutanixEndpointKey, infra.Spec.PlatformSpec.Nutanix.PCEndpoint)
-	if len(infra.Spec.PlatformSpec.Nutanix.PCPort) == 0 {
-		return fmt.Errorf("The pcPort field is not set in the Infrastreucture CR")
+	os.Setenv(clientpkg.NutanixEndpointKey, pcEndpoint)
+	if pcPort < 1 || pcPort > 65535 {
+		return fmt.Errorf("The pcPort field is not set right in the Infrastreucture CR: %d", pcPort)
 	}
-	os.Setenv(clientpkg.NutanixPortKey, infra.Spec.PlatformSpec.Nutanix.PCPort)
+	os.Setenv(clientpkg.NutanixPortKey, strconv.Itoa(int(pcPort)))
 
 	if s.providerSpec.CredentialsSecret == nil || len(s.providerSpec.CredentialsSecret.Name) == 0 {
 		return fmt.Errorf("The nutanix providerSpec credentialsSecret reference is not set.")

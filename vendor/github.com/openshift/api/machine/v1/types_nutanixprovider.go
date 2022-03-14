@@ -17,33 +17,44 @@ type NutanixMachineProviderConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// clusterReference is to identify the PE/cluster in which the Machine's VM will be created
+	// cluster is to identify the cluster (the Prism Element under management
+	// of the Prism Central), in which the Machine's VM will be created.
+	// The cluster identifier (uuid or name) can be obtained from the Prism Central console
+	// or using the prism_central API.
 	// +kubebuilder:validation:Required
-	ClusterReference *NutanixReference `json:"clusterReference"`
+	Cluster NutanixResourceIdentifier `json:"cluster"`
 
-	// imageReference is to identify the rhcos image uploaded to the Prism Central (PC)
+	// image is to identify the rhcos image uploaded to the Prism Central (PC)
+	// The image identifier (uuid or name) can be obtained from the Prism Central console
+	// or using the prism_central API.
 	// +kubebuilder:validation:Required
-	ImageReference *NutanixReference `json:"imageReference"`
+	Image NutanixResourceIdentifier `json:"image"`
 
-	// subnetReference is to identify the cluster's network subnet to use for the Machine's VM
+	// subnet is to identify the cluster's network subnet to use for the Machine's VM
+	// The cluster identifier (uuid or name) can be obtained from the Prism Central console
+	// or using the prism_central API.
 	// +kubebuilder:validation:Required
-	SubnetReference *NutanixReference `json:"subnetReference"`
+	Subnet NutanixResourceIdentifier `json:"subnet"`
 
-	// numVcpusPerSocket is the number of vCPUs per socket of the VM to create
+	// vcpusPerSocket is the number of vCPUs per socket of the VM
 	// +kubebuilder:validation:Required
-	NumVcpusPerSocket int64 `json:"numVcpusPerSocket"`
+	// +kubebuilder:validation:Minimum=1
+	VcpusPerSocket int32 `json:"vcpusPerSocket"`
 
-	// numSockets is the number of sockets of the VM to create
+	// vcpuSockets is the number of vCPU sockets of the VM
 	// +kubebuilder:validation:Required
-	NumSockets int64 `json:"numSockets"`
+	// +kubebuilder:validation:Minimum=1
+	VcpuSockets int32 `json:"vcpuSockets"`
 
-	// memorySize is the memory size (in Quantity format) of the VM to create
+	// memorySize is the memory size (in Quantity format) of the VM
+	// The minimum memorySize is 2Gi bytes
 	// +kubebuilder:validation:Required
 	MemorySize resource.Quantity `json:"memorySize"`
 
-	// diskSize is the system disk size (in Quantity format) of the VM to create
+	// systemDiskSize is size (in Quantity format) of the system disk of the VM
+	// The minimum systemDiskSize is 20Gi bytes
 	// +kubebuilder:validation:Required
-	DiskSize resource.Quantity `json:"diskSize"`
+	SystemDiskSize resource.Quantity `json:"systemDiskSize"`
 
 	// userDataSecret is a local reference to a secret that contains the
 	// UserData to apply to the VM
@@ -55,15 +66,32 @@ type NutanixMachineProviderConfig struct {
 	CredentialsSecret *corev1.LocalObjectReference `json:"credentialsSecret"`
 }
 
-// NutanixReference holds the identity of a Nutanix PC resource (cluster, image, subnet, etc.)
-type NutanixReference struct {
+// NutanixIdentifierType is an enumeration of different resource identifier types.
+type NutanixIdentifierType string
+
+const (
+	// NutanixIdentifierUUID is a resource identifier identifying the object by UUID.
+	NutanixIdentifierUUID NutanixIdentifierType = "uuid"
+
+	// NutanixIdentifierName is a resource identifier identifying the object by Name.
+	NutanixIdentifierName NutanixIdentifierType = "name"
+)
+
+// NutanixResourceIdentifier holds the identity of a Nutanix PC resource (cluster, image, subnet, etc.)
+// +union
+type NutanixResourceIdentifier struct {
+	// Type is the identifier type to use for this resource.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum:=uuid;name
+	Type NutanixIdentifierType `json:"type"`
+
 	// uuid is the UUID of the resource in the PC.
-	// If this is configured, it will be used to create the VM.
-	// Otherwise, the resource name will be used to obtain the UUID, before creating the VM.
-	UUID string `json:"uuid,omitempty"`
+	// +optional
+	UUID *string `json:"uuid,omitempty"`
 
 	// name is the resource name in the PC
-	Name string `json:"name,omitempty"`
+	// +optional
+	Name *string `json:"name,omitempty"`
 }
 
 // NutanixMachineProviderStatus is the type that will be embedded in a Machine.Status.ProviderStatus field.
@@ -79,11 +107,11 @@ type NutanixMachineProviderStatus struct {
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
-	// vmState is the Machine associated VM's current state
-	// +optional
-	VmState *string `json:"vmState,omitempty"`
-
 	// vmUUID is the Machine associated VM's UUID
+	// The field is missing either before the VM is created, or after the VM is deleted
+	// Once the VM is created, the field is filled with the VM's UUID and it will not change
+	// until the VM is deleted. The vmUUID is used to find the VM when updating the Machine status,
+	// and to delete the VM when the Machine is deleted.
 	// +optional
 	VmUUID *string `json:"vmUUID,omitempty"`
 }

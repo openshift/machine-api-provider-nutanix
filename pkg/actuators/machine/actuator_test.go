@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nutanix-cloud-native/prism-go-client/pkg/utils"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
@@ -50,8 +51,8 @@ func TestMachineEvents(t *testing.T) {
 			PlatformSpec: configv1.PlatformSpec{
 				Type: configv1.NutanixPlatformType,
 				Nutanix: &configv1.NutanixPlatformSpec{
-					PCEndpoint: "10.40.142.15",
-					PCPort:     "9440",
+					PrismCentralEndpoint: "10.40.142.15",
+					PrismCentralPort:     9440,
 				},
 			},
 		},
@@ -61,8 +62,8 @@ func TestMachineEvents(t *testing.T) {
 	defer func() {
 		g.Expect(k8sClient.Delete(ctx, infra)).To(Succeed())
 	}()
-	g.Expect(strings.EqualFold(infra.Spec.PlatformSpec.Nutanix.PCEndpoint, "10.40.142.15")).Should(BeTrue())
-	g.Expect(strings.EqualFold(infra.Spec.PlatformSpec.Nutanix.PCPort, "9440")).Should(BeTrue())
+	g.Expect(strings.EqualFold(infra.Spec.PlatformSpec.Nutanix.PrismCentralEndpoint, "10.40.142.15")).Should(BeTrue())
+	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismCentralPort == 9440).Should(BeTrue())
 
 	// Update the infrastructure status
 	infra.Status.InfrastructureName = "test-cluster-1"
@@ -230,13 +231,13 @@ func TestMachineEvents(t *testing.T) {
 			diskSizeQuantity, err := resource.ParseQuantity("120Gi")
 			g.Expect(err).ToNot(HaveOccurred())
 			providerSpec, err := RawExtensionFromNutanixMachineProviderSpec(&machinev1.NutanixMachineProviderConfig{
-				ClusterReference:  &machinev1.NutanixReference{Name: "ganon"},              //UUID: "0005b0f1-8f43-a0f2-02b7-3cecef193712"
-				ImageReference:    &machinev1.NutanixReference{Name: "rhcos-4.10-nutanix"}, //UUID: "ca59d2b3-c148-4c4a-bf9d-082b9508cf69"
-				SubnetReference:   &machinev1.NutanixReference{Name: "sherlock_net"},       //UUID: "c7938dc6-7659-453e-a688-e26020c68e43"
-				NumVcpusPerSocket: 2,
-				NumSockets:        1,
-				MemorySize:        memSizeQuantity,
-				DiskSize:          diskSizeQuantity,
+				Cluster:        machinev1.NutanixResourceIdentifier{Name: utils.StringPtr("ganon")},
+				Image:          machinev1.NutanixResourceIdentifier{Name: utils.StringPtr("rhcos-4.10-nutanix")},
+				Subnet:         machinev1.NutanixResourceIdentifier{Name: utils.StringPtr("sherlock_net")},
+				VcpusPerSocket: 2,
+				VcpuSockets:    1,
+				MemorySize:     memSizeQuantity,
+				SystemDiskSize: diskSizeQuantity,
 				CredentialsSecret: &corev1.LocalObjectReference{
 					Name: NutanixCredentialsSecretName,
 				},

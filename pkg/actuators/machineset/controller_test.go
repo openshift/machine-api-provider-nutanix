@@ -70,8 +70,8 @@ var _ = Describe("MachineSet Reconciler", func() {
 	})
 
 	type reconcileTestCase = struct {
-		numVcpusPerSocket   int64
-		numSockets          int64
+		numVcpusPerSocket   int32
+		numSockets          int32
 		memorySize          resource.Quantity
 		existingAnnotations map[string]string
 		expectedAnnotations map[string]string
@@ -167,8 +167,8 @@ func deleteMachineSets(c client.Client, namespaceName string) error {
 func TestReconcile(t *testing.T) {
 	testCases := []struct {
 		name                string
-		numVcpusPerSocket   int64
-		numSockets          int64
+		numVcpusPerSocket   int32
+		numSockets          int32
 		memorySize          resource.Quantity
 		existingAnnotations map[string]string
 		expectedAnnotations map[string]string
@@ -224,7 +224,7 @@ func parseQuantity(str string) resource.Quantity {
 	return q
 }
 
-func newTestMachineSet(namespace string, numVcpusPerSocket, numSockets int64, memorySize resource.Quantity,
+func newTestMachineSet(namespace string, numVcpusPerSocket, numSockets int32, memorySize resource.Quantity,
 	existingAnnotations map[string]string) (*machinev1b1.MachineSet, error) {
 
 	// Copy anntotations map so we don't modify the input
@@ -234,9 +234,9 @@ func newTestMachineSet(namespace string, numVcpusPerSocket, numSockets int64, me
 	}
 
 	machineProviderSpec := &machinev1.NutanixMachineProviderConfig{
-		NumVcpusPerSocket: numVcpusPerSocket,
-		NumSockets:        numSockets,
-		MemorySize:        memorySize,
+		VcpusPerSocket: numVcpusPerSocket,
+		VcpuSockets:    numSockets,
+		MemorySize:     memorySize,
 	}
 	providerSpec, err := providerSpecFromMachine(machineProviderSpec)
 	if err != nil {
