@@ -234,8 +234,8 @@ func newTestMachineSet(namespace string, numVcpusPerSocket, numSockets int32, me
 	}
 
 	machineProviderSpec := &machinev1.NutanixMachineProviderConfig{
-		VcpusPerSocket: numVcpusPerSocket,
-		VcpuSockets:    numSockets,
+		VCPUsPerSocket: numVcpusPerSocket,
+		VCPUSockets:    numSockets,
 		MemorySize:     memorySize,
 	}
 	providerSpec, err := providerSpecFromMachine(machineProviderSpec)

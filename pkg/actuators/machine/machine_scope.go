@@ -102,8 +102,8 @@ func (s *machineScope) getNutanixCredentials() error {
 	}
 
 	// Set the corresponding environment variable
-	pcEndpoint := infra.Spec.PlatformSpec.Nutanix.PrismCentralEndpoint
-	pcPort := infra.Spec.PlatformSpec.Nutanix.PrismCentralPort
+	pcEndpoint := infra.Spec.PlatformSpec.Nutanix.PrismCentral.Address
+	pcPort := infra.Spec.PlatformSpec.Nutanix.PrismCentral.Port
 	if len(pcEndpoint) == 0 {
 		return fmt.Errorf("The prismCentralEndpoint field is not set in the Infrastreucture CR")
 	}

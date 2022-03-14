@@ -114,7 +114,7 @@ func reconcile(machineSet *machinev1b1.MachineSet) (ctrl.Result, error) {
 	}
 
 	// TODO: get annotations keys from machine API
-	machineSet.Annotations[cpuKey] = strconv.FormatInt(int64(providerConfig.VcpusPerSocket*providerConfig.VcpuSockets), 10)
+	machineSet.Annotations[cpuKey] = strconv.FormatInt(int64(providerConfig.VCPUsPerSocket*providerConfig.VCPUSockets), 10)
 	machineSet.Annotations[memoryKey] = strconv.FormatInt(machineactuator.GetMibValueOfQuality(providerConfig.MemorySize), 10)
 
 	return ctrl.Result{}, nil

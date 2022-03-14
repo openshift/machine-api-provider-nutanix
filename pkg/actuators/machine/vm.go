@@ -84,8 +84,8 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 		vmSpec.Resources = &nutanixClientV3.VMResources{
 			PowerState:            utils.StringPtr("ON"),
 			HardwareClockTimezone: utils.StringPtr("UTC"),
-			NumVcpusPerSocket:     utils.Int64Ptr(int64(mscp.providerSpec.VcpusPerSocket)),
-			NumSockets:            utils.Int64Ptr(int64(mscp.providerSpec.VcpuSockets)),
+			NumVcpusPerSocket:     utils.Int64Ptr(int64(mscp.providerSpec.VCPUsPerSocket)),
+			NumSockets:            utils.Int64Ptr(int64(mscp.providerSpec.VCPUSockets)),
 			MemorySizeMib:         utils.Int64Ptr(GetMibValueOfQuality(mscp.providerSpec.MemorySize)),
 			NicList:               nicList,
 			DiskList:              diskList,

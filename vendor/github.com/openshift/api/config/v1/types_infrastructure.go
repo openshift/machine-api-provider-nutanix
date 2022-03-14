@@ -706,16 +706,28 @@ type AlibabaCloudResourceTag struct {
 // NutanixPlatformSpec holds the desired state of the Nutanix infrastructure provider.
 // This only includes fields that can be modified in the cluster.
 type NutanixPlatformSpec struct {
-	// prismCentralEndpoint is the endpoint (DNS name or IP address) of the Nutanix Prism Central
+	// prismCentral holds the endpoint and port to access the Nutanix Prism Central
+	// +kubebuilder:validation:Required
+	PrismCentral NutanixPrismEndpoint `json:"prismCentral"`
+
+	// prismElements holds an array of endpoint and port data to access the Nutanix
+	// Prism Elements (clusters) of the Nutanix Prism Central
+	// +kubebuilder:validation:Required
+	PrismElements []NutanixPrismEndpoint `json:"prismElements"`
+}
+
+// NutanixPrismEndpoint holds the endpoint and port to access the Nutanix Prism Central or Element (cluster)
+type NutanixPrismEndpoint struct {
+	// address is the endpoint address (DNS name or IP address) of the Nutanix Prism Central or Element (cluster)
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=256
-	PrismCentralEndpoint string `json:"prismCentralEndpoint"`
+	Address string `json:"address"`
 
-	// prismCentralPort is the port of the Nutanix Prism Central
+	// port is the port number to access the Nutanix Prism Central or Element (cluster)
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=65535
-	PrismCentralPort int32 `json:"prismCentralPort"`
+	Port int32 `json:"port"`
 }
 
 // NutanixPlatformStatus holds the current status of the Nutanix infrastructure provider.

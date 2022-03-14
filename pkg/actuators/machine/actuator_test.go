@@ -51,8 +51,8 @@ func TestMachineEvents(t *testing.T) {
 			PlatformSpec: configv1.PlatformSpec{
 				Type: configv1.NutanixPlatformType,
 				Nutanix: &configv1.NutanixPlatformSpec{
-					PrismCentralEndpoint: "10.40.142.15",
-					PrismCentralPort:     9440,
+					PrismCentral:  configv1.NutanixPrismEndpoint{Address: "10.40.142.15", Port: 9440},
+					PrismElements: []configv1.NutanixPrismEndpoint{{Address: "10.40.231.131", Port: 9440}},
 				},
 			},
 		},
@@ -62,8 +62,11 @@ func TestMachineEvents(t *testing.T) {
 	defer func() {
 		g.Expect(k8sClient.Delete(ctx, infra)).To(Succeed())
 	}()
-	g.Expect(strings.EqualFold(infra.Spec.PlatformSpec.Nutanix.PrismCentralEndpoint, "10.40.142.15")).Should(BeTrue())
-	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismCentralPort == 9440).Should(BeTrue())
+	g.Expect(strings.EqualFold(infra.Spec.PlatformSpec.Nutanix.PrismCentral.Address, "10.40.142.15")).Should(BeTrue())
+	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismCentral.Port == 9440).Should(BeTrue())
+	g.Expect(len(infra.Spec.PlatformSpec.Nutanix.PrismElements) == 1).Should(BeTrue())
+	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismElements[0].Address == "10.40.231.131").Should(BeTrue())
+	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismElements[0].Port == 9440).Should(BeTrue())
 
 	// Update the infrastructure status
 	infra.Status.InfrastructureName = "test-cluster-1"
@@ -234,8 +237,8 @@ func TestMachineEvents(t *testing.T) {
 				Cluster:        machinev1.NutanixResourceIdentifier{Name: utils.StringPtr("ganon")},
 				Image:          machinev1.NutanixResourceIdentifier{Name: utils.StringPtr("rhcos-4.10-nutanix")},
 				Subnet:         machinev1.NutanixResourceIdentifier{Name: utils.StringPtr("sherlock_net")},
-				VcpusPerSocket: 2,
-				VcpuSockets:    1,
+				VCPUsPerSocket: 2,
+				VCPUSockets:    1,
 				MemorySize:     memSizeQuantity,
 				SystemDiskSize: diskSizeQuantity,
 				CredentialsSecret: &corev1.LocalObjectReference{
