@@ -3,6 +3,7 @@ package machine
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix/v3"
 	corev1 "k8s.io/api/core/v1"
@@ -130,13 +131,12 @@ func (r *Reconciler) update() error {
 
 // delete deletes VM
 func (r *Reconciler) delete() error {
+	var err error
 	klog.Infof("%s: deleting machine", r.machine.Name)
 
-	var err error
 	if r.providerStatus.VmUUID == nil {
-		err = fmt.Errorf("%s: cannot delete the vm, the vmUUID is null.", r.machine.Name)
-		klog.Errorf(err.Error())
-		return err
+		klog.Warningf("%s: cannot delete a vm not yet created, the vmUUID is null.", r.machine.Name)
+		return nil
 	}
 
 	vmUuid := *r.providerStatus.VmUUID
@@ -158,7 +158,7 @@ func (r *Reconciler) delete() error {
 			return fmt.Errorf("failed to determine if node %v has attached volumes: %w", r.machine.Status.NodeRef.Name, err)
 		}
 		if attached {
-			return fmt.Errorf("node %v has attached volumes, requeuing", r.machine.Status.NodeRef.Name)
+			return &machinecontroller.RequeueAfterError{RequeueAfter: 20 * time.Second}
 		}
 	}
 
@@ -177,7 +177,6 @@ func (r *Reconciler) delete() error {
 	// update machine spec and status
 	r.machine.Spec.ProviderID = nil
 	r.machine.Status.Addresses = r.machine.Status.Addresses[:0]
-	r.providerStatus.VmUUID = nil
 
 	klog.Infof("Deleted machine %v vm with uuid %s", r.machine.Name, vmUuid)
 	return nil

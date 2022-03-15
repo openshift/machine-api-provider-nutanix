@@ -131,7 +131,7 @@ func TestMachineEvents(t *testing.T) {
 		g.Expect(k8sClient.Delete(ctx, userDataSecret)).To(Succeed())
 	}()
 
-	//var vmUuid *string
+	var vmUuid *string
 	cases := []struct {
 		name        string
 		machineName string
@@ -156,7 +156,7 @@ func TestMachineEvents(t *testing.T) {
 			},
 			event: "missing \"machine.openshift.io/cluster-api-cluster\" label",
 		},
-		/*{
+		{
 			name:        "Create machine succeed",
 			machineName: "test-machine",
 			operation: func(actuator *Actuator, machine *machinev1b1.Machine) {
@@ -169,7 +169,7 @@ func TestMachineEvents(t *testing.T) {
 				g.Expect(machine.Status.Addresses).To(HaveLen(2))
 			},
 			event: "Created Machine",
-		},*/
+		},
 		{
 			name:        "Update machine failed on invalid machine scope",
 			machineName: "test-machine",
@@ -187,7 +187,7 @@ func TestMachineEvents(t *testing.T) {
 			},
 			event: "missing \"machine.openshift.io/cluster-api-cluster\" label",
 		},
-		/*{
+		{
 			name:        "Update machine succeed",
 			machineName: "test-machine",
 			operation: func(actuator *Actuator, machine *machinev1b1.Machine) {
@@ -201,7 +201,7 @@ func TestMachineEvents(t *testing.T) {
 				actuator.Update(ctx, machine)
 			},
 			event: "Updated Machine",
-		},*/
+		},
 		{
 			name:        "Delete machine event failed on invalid machine scope",
 			machineName: "test-machine",
@@ -210,7 +210,7 @@ func TestMachineEvents(t *testing.T) {
 			},
 			event: "context and machine should not be nil",
 		},
-		/*{
+		{
 			name:        "Delete machine succeed",
 			machineName: "test-machine",
 			operation: func(actuator *Actuator, machine *machinev1b1.Machine) {
@@ -224,7 +224,7 @@ func TestMachineEvents(t *testing.T) {
 				actuator.Delete(ctx, machine)
 			},
 			event: "Deleted machine",
-		},*/
+		},
 	}
 
 	for _, tc := range cases {
