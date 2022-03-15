@@ -51,8 +51,10 @@ func TestMachineEvents(t *testing.T) {
 			PlatformSpec: configv1.PlatformSpec{
 				Type: configv1.NutanixPlatformType,
 				Nutanix: &configv1.NutanixPlatformSpec{
-					PrismCentral:  configv1.NutanixPrismEndpoint{Address: "10.40.142.15", Port: 9440},
-					PrismElements: []configv1.NutanixPrismEndpoint{{Address: "10.40.231.131", Port: 9440}},
+					PrismCentral: configv1.NutanixPrismEndpoint{Address: "10.40.142.15", Port: 9440},
+					PrismElements: []configv1.NutanixPrismElementEndpoint{
+						{Name: "ganon", Endpoint: configv1.NutanixPrismEndpoint{Address: "10.40.231.131", Port: 9440}},
+					},
 				},
 			},
 		},
@@ -65,8 +67,9 @@ func TestMachineEvents(t *testing.T) {
 	g.Expect(strings.EqualFold(infra.Spec.PlatformSpec.Nutanix.PrismCentral.Address, "10.40.142.15")).Should(BeTrue())
 	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismCentral.Port == 9440).Should(BeTrue())
 	g.Expect(len(infra.Spec.PlatformSpec.Nutanix.PrismElements) == 1).Should(BeTrue())
-	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismElements[0].Address == "10.40.231.131").Should(BeTrue())
-	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismElements[0].Port == 9440).Should(BeTrue())
+	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismElements[0].Name == "ganon").Should(BeTrue())
+	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismElements[0].Endpoint.Address == "10.40.231.131").Should(BeTrue())
+	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismElements[0].Endpoint.Port == 9440).Should(BeTrue())
 
 	// Update the infrastructure status
 	infra.Status.InfrastructureName = "test-cluster-1"
