@@ -23,10 +23,10 @@ const (
 	cloudCABundleKey = "ca-bundle.pem"
 
 	// Nutanix credential keys
-	NutanixEndpointKey = "NUTANIX_ENDPOINT"
-	NutanixPortKey     = "NUTANIX_PORT"
-	NutanixUserKey     = "NUTANIX_USER"
-	NutanixPasswordKey = "NUTANIX_PASSWORD"
+	NutanixEndpointKey = "Nutanix_PrismCentral_Endpoint"
+	NutanixPortKey     = "Nutanix_PrismCentral_Port"
+	NutanixUserKey     = "Nutanix_PrismCentral_User"
+	NutanixPasswordKey = "Nutanix_PrismCentral_Password"
 )
 
 type ClientOptions struct {

@@ -97,7 +97,7 @@ spec:
                         - prismElements
                       properties:
                         prismCentral:
-                          description: prismCentral holds the endpoint address and port to access the Nutanix Prism Central
+                          description: prismCentral holds the endpoint address and port to access the Nutanix Prism Central. When a cluster-wide proxy is installed, this endpoint will not be accessed via the proxy.
                           type: object
                           required:
                             - address
@@ -114,7 +114,7 @@ spec:
                               maximum: 65535
                               minimum: 1
                         prismElements:
-                          description: prismElements holds one or more endpoint address and port data to access the Nutanix Prism Elements (clusters) of the Nutanix Prism Central. Currently we only support one Prism Element (cluster) for an openshift cluster, where all the Nutanix resources (VMs, subnet, etc.) used in the Openshift cluster locate. In the future, we may support the Nutanix resources (VMs, etc.) used in the Openshift cluster can come from multiple Prism Elements (clusters) of the Prism Cental.
+                          description: prismElements holds one or more endpoint address and port data to access the Nutanix Prism Elements (clusters) of the Nutanix Prism Central. Currently we only support one Prism Element (cluster) for an OpenShift cluster, where all the Nutanix resources (VMs, subnets, volumes, etc.) used in the OpenShift cluster are located. In the future, we may support Nutanix resources (VMs, etc.) spread over multiple Prism Elements (clusters) of the Prism Central.
                           type: array
                           items:
                             description: NutanixPrismElementEndpoint holds the name and endpoint data for a Prism Element (cluster)
@@ -124,7 +124,7 @@ spec:
                               - name
                             properties:
                               endpoint:
-                                description: endpoint holds the endpoint address and port data of the Prism Element (cluster)
+                                description: endpoint holds the endpoint address and port data of the Prism Element (cluster). When a cluster-wide proxy is installed, this endpoint will not be accessed via the proxy.
                                 type: object
                                 required:
                                   - address
@@ -141,9 +141,12 @@ spec:
                                     maximum: 65535
                                     minimum: 1
                               name:
-                                description: name is the name of the Prism Element (cluster)
+                                description: name is the name of the Prism Element (cluster). This value will correspond with the cluster field configured on other resources (eg Machines, PVCs, etc).
                                 type: string
                                 maxLength: 256
+                          x-kubernetes-list-map-keys:
+                            - name
+                          x-kubernetes-list-type: map
                     openstack:
                       description: OpenStack contains settings specific to the OpenStack infrastructure provider.
                       type: object

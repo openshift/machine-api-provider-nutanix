@@ -706,16 +706,19 @@ type AlibabaCloudResourceTag struct {
 // NutanixPlatformSpec holds the desired state of the Nutanix infrastructure provider.
 // This only includes fields that can be modified in the cluster.
 type NutanixPlatformSpec struct {
-	// prismCentral holds the endpoint address and port to access the Nutanix Prism Central
+	// prismCentral holds the endpoint address and port to access the Nutanix Prism Central.
+	// When a cluster-wide proxy is installed, this endpoint will not be accessed via the proxy.
 	// +kubebuilder:validation:Required
 	PrismCentral NutanixPrismEndpoint `json:"prismCentral"`
 
 	// prismElements holds one or more endpoint address and port data to access the Nutanix
 	// Prism Elements (clusters) of the Nutanix Prism Central. Currently we only support one
-	// Prism Element (cluster) for an openshift cluster, where all the Nutanix resources (VMs, subnet, etc.)
-	// used in the Openshift cluster locate. In the future, we may support the Nutanix resources (VMs, etc.)
-	// used in the Openshift cluster can come from multiple Prism Elements (clusters) of the Prism Cental.
+	// Prism Element (cluster) for an OpenShift cluster, where all the Nutanix resources (VMs, subnets, volumes, etc.)
+	// used in the OpenShift cluster are located. In the future, we may support Nutanix resources (VMs, etc.)
+	// spread over multiple Prism Elements (clusters) of the Prism Central.
 	// +kubebuilder:validation:Required
+	// +listType=map
+	// +listMapKey=name
 	PrismElements []NutanixPrismElementEndpoint `json:"prismElements"`
 }
 
@@ -735,12 +738,14 @@ type NutanixPrismEndpoint struct {
 
 // NutanixPrismElementEndpoint holds the name and endpoint data for a Prism Element (cluster)
 type NutanixPrismElementEndpoint struct {
-	// name is the name of the Prism Element (cluster)
+	// name is the name of the Prism Element (cluster). This value will correspond with
+	// the cluster field configured on other resources (eg Machines, PVCs, etc).
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=256
 	Name string `json:"name"`
 
-	// endpoint holds the endpoint address and port data of the Prism Element (cluster)
+	// endpoint holds the endpoint address and port data of the Prism Element (cluster).
+	// When a cluster-wide proxy is installed, this endpoint will not be accessed via the proxy.
 	// +kubebuilder:validation:Required
 	Endpoint NutanixPrismEndpoint `json:"endpoint"`
 }

@@ -9,7 +9,7 @@ require (
 	github.com/nutanix-cloud-native/prism-go-client v0.0.0-20211220162817-689f23de3cdc
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.17.0
-	github.com/openshift/api v0.0.0-20220204103739-31ffd77a8f02
+	github.com/openshift/api v0.0.0-20220318144256-d7c0680ad701
 	github.com/openshift/machine-api-operator v0.2.1-0.20211220105028-362d5b50beca
 
 	// kube 1.23
@@ -69,6 +69,7 @@ require (
 	github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/openshift/client-go v0.0.0-20211209144617-7385dd6338e3 // indirect
+	github.com/openshift/library-go v0.0.0-20220121154930-b7889002d63e // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -110,7 +111,5 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.0 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
-
-replace github.com/openshift/api => ../../openshift/api
 
 replace github.com/openshift/machine-api-operator => ../../openshift/machine-api-operator
