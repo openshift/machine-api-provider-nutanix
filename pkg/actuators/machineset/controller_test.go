@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 	gtypes "github.com/onsi/gomega/types"
 	machinev1 "github.com/openshift/api/machine/v1"
-	machinev1b1 "github.com/openshift/api/machine/v1beta1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -86,7 +86,7 @@ var _ = Describe("MachineSet Reconciler", func() {
 		Expect(c.Create(ctx, machineSet)).To(Succeed())
 
 		Eventually(func() map[string]string {
-			m := &machinev1b1.MachineSet{}
+			m := &machinev1beta1.MachineSet{}
 			key := client.ObjectKey{Namespace: machineSet.Namespace, Name: machineSet.Name}
 			err := c.Get(ctx, key, m)
 			if err != nil {
@@ -136,7 +136,7 @@ var _ = Describe("MachineSet Reconciler", func() {
 })
 
 func deleteMachineSets(c client.Client, namespaceName string) error {
-	machineSets := &machinev1b1.MachineSetList{}
+	machineSets := &machinev1beta1.MachineSetList{}
 	err := c.List(ctx, machineSets, client.InNamespace(namespaceName))
 	if err != nil {
 		return err
@@ -150,7 +150,7 @@ func deleteMachineSets(c client.Client, namespaceName string) error {
 	}
 
 	Eventually(func() error {
-		machineSets := &machinev1b1.MachineSetList{}
+		machineSets := &machinev1beta1.MachineSetList{}
 		err := c.List(ctx, machineSets)
 		if err != nil {
 			return err
@@ -225,7 +225,7 @@ func parseQuantity(str string) resource.Quantity {
 }
 
 func newTestMachineSet(namespace string, numVcpusPerSocket, numSockets int32, memorySize resource.Quantity,
-	existingAnnotations map[string]string) (*machinev1b1.MachineSet, error) {
+	existingAnnotations map[string]string) (*machinev1beta1.MachineSet, error) {
 
 	// Copy anntotations map so we don't modify the input
 	annotations := make(map[string]string)
@@ -244,16 +244,16 @@ func newTestMachineSet(namespace string, numVcpusPerSocket, numSockets int32, me
 	}
 
 	replicas := int32(1)
-	return &machinev1b1.MachineSet{
+	return &machinev1beta1.MachineSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations:  annotations,
 			GenerateName: "test-machineset-",
 			Namespace:    namespace,
 		},
-		Spec: machinev1b1.MachineSetSpec{
+		Spec: machinev1beta1.MachineSetSpec{
 			Replicas: &replicas,
-			Template: machinev1b1.MachineTemplateSpec{
-				Spec: machinev1b1.MachineSpec{
+			Template: machinev1beta1.MachineTemplateSpec{
+				Spec: machinev1beta1.MachineSpec{
 					ProviderSpec: providerSpec,
 				},
 			},
@@ -261,12 +261,12 @@ func newTestMachineSet(namespace string, numVcpusPerSocket, numSockets int32, me
 	}, nil
 }
 
-func providerSpecFromMachine(in *machinev1.NutanixMachineProviderConfig) (machinev1b1.ProviderSpec, error) {
+func providerSpecFromMachine(in *machinev1.NutanixMachineProviderConfig) (machinev1beta1.ProviderSpec, error) {
 	bytes, err := json.Marshal(in)
 	if err != nil {
-		return machinev1b1.ProviderSpec{}, err
+		return machinev1beta1.ProviderSpec{}, err
 	}
-	return machinev1b1.ProviderSpec{
+	return machinev1beta1.ProviderSpec{
 		Value: &runtime.RawExtension{Raw: bytes},
 	}, nil
 }

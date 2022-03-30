@@ -76,7 +76,7 @@ func newMachineScope(params machineScopeParams) (*machineScope, error) {
 	}
 
 	if err := mscp.getNutanixCredentials(); err != nil {
-		return nil, fmt.Errorf("failed to get the credentials to access the Nutanix PC: %v", err.Error())
+		return nil, fmt.Errorf("failed to get the credentials to access the Nutanix PC: %w", err)
 	}
 
 	nutanixClient, err := clientpkg.Client(clientpkg.ClientOptions{Debug: true})
@@ -97,7 +97,7 @@ func (s *machineScope) getNutanixCredentials() error {
 	err := s.client.Get(s.Context, infraKey, infra)
 	if err != nil {
 		err1 := fmt.Errorf("Could not find the Infrastruture object %q: %v", infraKey.Name, err)
-		klog.Errorf("Machine %s: %v", err1.Error())
+		klog.Errorf("Machine %s: %v", s.machine.Name, err1.Error())
 		return err1
 	}
 

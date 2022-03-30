@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -20,7 +21,7 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
-	machinev1b1 "github.com/openshift/api/machine/v1beta1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	clientpkg "github.com/openshift/machine-api-provider-nutanix/pkg/client"
 )
 
@@ -31,7 +32,7 @@ const (
 
 func init() {
 	// Add types to scheme
-	machinev1b1.AddToScheme(scheme.Scheme)
+	machinev1beta1.AddToScheme(scheme.Scheme)
 	machinev1.Install(scheme.Scheme)
 	configv1.AddToScheme(scheme.Scheme)
 }
@@ -96,9 +97,9 @@ func TestMachineEvents(t *testing.T) {
 		g.Expect(k8sClient.Delete(ctx, testNs)).To(Succeed())
 	}()
 
-	user, err := base64.StdEncoding.DecodeString("YWRtaW4=")
+	user, err := base64.StdEncoding.DecodeString(os.Getenv("Nutanix_PrismCentral_User"))
 	g.Expect(err).ToNot(HaveOccurred())
-	password, err := base64.StdEncoding.DecodeString("TnV0YW5peC4xMjM=")
+	password, err := base64.StdEncoding.DecodeString(os.Getenv("Nutanix_PrismCentral_Password"))
 	g.Expect(err).ToNot(HaveOccurred())
 
 	credsSecret := corev1.Secret{
@@ -136,13 +137,13 @@ func TestMachineEvents(t *testing.T) {
 		name        string
 		machineName string
 		error       string
-		operation   func(actuator *Actuator, machine *machinev1b1.Machine)
+		operation   func(actuator *Actuator, machine *machinev1beta1.Machine)
 		event       string
 	}{
 		{
 			name:        "Create machine failed on invalid machine scope",
 			machineName: "test-machine",
-			operation: func(actuator *Actuator, machine *machinev1b1.Machine) {
+			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
 				actuator.Create(nil, machine)
 			},
 			event: "context and machine should not be nil",
@@ -150,8 +151,8 @@ func TestMachineEvents(t *testing.T) {
 		{
 			name:        "Create machine failed on missing required label",
 			machineName: "test-machine",
-			operation: func(actuator *Actuator, machine *machinev1b1.Machine) {
-				machine.Labels[machinev1b1.MachineClusterIDLabel] = ""
+			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
+				machine.Labels[machinev1beta1.MachineClusterIDLabel] = ""
 				actuator.Create(ctx, machine)
 			},
 			event: "missing \"machine.openshift.io/cluster-api-cluster\" label",
@@ -159,7 +160,7 @@ func TestMachineEvents(t *testing.T) {
 		/*{
 			name:        "Create machine succeed",
 			machineName: "test-machine",
-			operation: func(actuator *Actuator, machine *machinev1b1.Machine) {
+			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
 				actuator.Create(ctx, machine)
 				providerStatus, err1 := NutanixMachineProviderStatusFromRawExtension(machine.Status.ProviderStatus)
 				g.Expect(err1).ToNot(HaveOccurred())
@@ -173,7 +174,7 @@ func TestMachineEvents(t *testing.T) {
 		{
 			name:        "Update machine failed on invalid machine scope",
 			machineName: "test-machine",
-			operation: func(actuator *Actuator, machine *machinev1b1.Machine) {
+			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
 				actuator.Update(nil, machine)
 			},
 			event: "context and machine should not be nil",
@@ -181,8 +182,8 @@ func TestMachineEvents(t *testing.T) {
 		{
 			name:        "Update failed on missing required label",
 			machineName: "test-machine",
-			operation: func(actuator *Actuator, machine *machinev1b1.Machine) {
-				machine.Labels[machinev1b1.MachineClusterIDLabel] = ""
+			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
+				machine.Labels[machinev1beta1.MachineClusterIDLabel] = ""
 				actuator.Update(ctx, machine)
 			},
 			event: "missing \"machine.openshift.io/cluster-api-cluster\" label",
@@ -190,7 +191,7 @@ func TestMachineEvents(t *testing.T) {
 		/*{
 			name:        "Update machine succeed",
 			machineName: "test-machine",
-			operation: func(actuator *Actuator, machine *machinev1b1.Machine) {
+			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
 				g.Expect(vmUuid).NotTo(BeNil())
 				providerStatus, err1 := NutanixMachineProviderStatusFromRawExtension(machine.Status.ProviderStatus)
 				g.Expect(err1).ToNot(HaveOccurred())
@@ -205,7 +206,7 @@ func TestMachineEvents(t *testing.T) {
 		{
 			name:        "Delete machine event failed on invalid machine scope",
 			machineName: "test-machine",
-			operation: func(actuator *Actuator, machine *machinev1b1.Machine) {
+			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
 				actuator.Delete(nil, machine)
 			},
 			event: "context and machine should not be nil",
@@ -213,7 +214,7 @@ func TestMachineEvents(t *testing.T) {
 		/*{
 			name:        "Delete machine succeed",
 			machineName: "test-machine",
-			operation: func(actuator *Actuator, machine *machinev1b1.Machine) {
+			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
 				g.Expect(vmUuid).NotTo(BeNil())
 				providerStatus, err1 := NutanixMachineProviderStatusFromRawExtension(machine.Status.ProviderStatus)
 				g.Expect(err1).ToNot(HaveOccurred())
@@ -233,9 +234,9 @@ func TestMachineEvents(t *testing.T) {
 			gs := NewWithT(t)
 
 			providerSpec, err := RawExtensionFromNutanixMachineProviderSpec(&machinev1.NutanixMachineProviderConfig{
-				Cluster:        machinev1.NutanixResourceIdentifier{Name: utils.StringPtr("ganon")},
-				Image:          machinev1.NutanixResourceIdentifier{Name: utils.StringPtr("rhcos-4.10-nutanix")},
-				Subnet:         machinev1.NutanixResourceIdentifier{Name: utils.StringPtr("sherlock_net")},
+				Cluster:        machinev1.NutanixResourceIdentifier{Type: "name", Name: utils.StringPtr("ganon")},
+				Image:          machinev1.NutanixResourceIdentifier{Type: "name", Name: utils.StringPtr("rhcos-4.10-nutanix")},
+				Subnet:         machinev1.NutanixResourceIdentifier{Type: "name", Name: utils.StringPtr("sherlock_net")},
 				VCPUsPerSocket: 2,
 				VCPUSockets:    1,
 				MemorySize:     resource.MustParse("4096Mi"),
@@ -249,20 +250,20 @@ func TestMachineEvents(t *testing.T) {
 			})
 			gs.Expect(err).ToNot(HaveOccurred())
 
-			machine := &machinev1b1.Machine{
+			machine := &machinev1beta1.Machine{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      tc.machineName,
 					Namespace: testNsName,
 					Labels: map[string]string{
-						machinev1b1.MachineClusterIDLabel: "CLUSTERID",
+						machinev1beta1.MachineClusterIDLabel: "CLUSTERID",
 					},
 				},
-				Spec: machinev1b1.MachineSpec{
-					ProviderSpec: machinev1b1.ProviderSpec{
+				Spec: machinev1beta1.MachineSpec{
+					ProviderSpec: machinev1beta1.ProviderSpec{
 						Value: providerSpec,
 					},
 				},
-				Status: machinev1b1.MachineStatus{
+				Status: machinev1beta1.MachineStatus{
 					NodeRef: &v1.ObjectReference{
 						Name: tc.machineName,
 					},
@@ -278,7 +279,7 @@ func TestMachineEvents(t *testing.T) {
 			// Ensure the machine has synced to the cache
 			getMachine := func() error {
 				machineKey := types.NamespacedName{Namespace: machine.Namespace, Name: machine.Name}
-				return k8sClient.Get(ctx, machineKey, &machinev1b1.Machine{})
+				return k8sClient.Get(ctx, machineKey, &machinev1beta1.Machine{})
 			}
 			gs.Eventually(getMachine, timeout).Should(Succeed())
 
@@ -286,7 +287,7 @@ func TestMachineEvents(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: tc.machineName,
 					Labels: map[string]string{
-						machinev1b1.MachineClusterIDLabel: "CLUSTERID",
+						machinev1beta1.MachineClusterIDLabel: "CLUSTERID",
 					},
 				},
 				Spec: v1.NodeSpec{},

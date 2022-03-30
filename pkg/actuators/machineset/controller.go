@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/go-logr/logr"
-	machinev1b1 "github.com/openshift/api/machine/v1beta1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	mapierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	machineactuator "github.com/openshift/machine-api-provider-nutanix/pkg/actuators/machine"
 	corev1 "k8s.io/api/core/v1"
@@ -38,7 +38,7 @@ type Reconciler struct {
 // SetupWithManager creates a new controller for a manager.
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager, options controller.Options) error {
 	_, err := ctrl.NewControllerManagedBy(mgr).
-		For(&machinev1b1.MachineSet{}).
+		For(&machinev1beta1.MachineSet{}).
 		WithOptions(options).
 		Build(r)
 
@@ -56,7 +56,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	logger := r.Log.WithValues("machineset", req.Name, "namespace", req.Namespace)
 	logger.V(3).Info("Reconciling")
 
-	machineSet := &machinev1b1.MachineSet{}
+	machineSet := &machinev1beta1.MachineSet{}
 	if err := r.Client.Get(ctx, req.NamespacedName, machineSet); err != nil {
 		if apierrors.IsNotFound(err) {
 			// Object not found, return. Created objects are automatically garbage collected.
@@ -96,14 +96,14 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 func isInvalidConfigurationError(err error) bool {
 	switch t := err.(type) {
 	case *mapierrors.MachineError:
-		if t.Reason == machinev1b1.InvalidConfigurationMachineError {
+		if t.Reason == machinev1beta1.InvalidConfigurationMachineError {
 			return true
 		}
 	}
 	return false
 }
 
-func reconcile(machineSet *machinev1b1.MachineSet) (ctrl.Result, error) {
+func reconcile(machineSet *machinev1beta1.MachineSet) (ctrl.Result, error) {
 	providerConfig, err := machineactuator.NutanixMachineProviderSpecFromRawExtension(machineSet.Spec.Template.Spec.ProviderSpec.Value)
 	if err != nil {
 		return ctrl.Result{}, mapierrors.InvalidMachineConfiguration("failed to get providerConfig: %v", err)
@@ -115,7 +115,7 @@ func reconcile(machineSet *machinev1b1.MachineSet) (ctrl.Result, error) {
 
 	// TODO: get annotations keys from machine API
 	machineSet.Annotations[cpuKey] = strconv.FormatInt(int64(providerConfig.VCPUsPerSocket*providerConfig.VCPUSockets), 10)
-	machineSet.Annotations[memoryKey] = strconv.FormatInt(machineactuator.GetMibValueOfQuality(providerConfig.MemorySize), 10)
+	machineSet.Annotations[memoryKey] = strconv.FormatInt(machineactuator.GetMibValueOfQuantity(providerConfig.MemorySize), 10)
 
 	return ctrl.Result{}, nil
 }

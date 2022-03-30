@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	machinev1 "github.com/openshift/api/machine/v1"
-	machinev1b1 "github.com/openshift/api/machine/v1beta1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -262,17 +262,17 @@ func conditionInstanceReady(status metav1.ConditionStatus) metav1.Condition {
 
 // validateMachine checks the label that a machine must have to identify the cluster
 // to which it belongs is present.
-func validateMachine(machine machinev1b1.Machine) error {
-	if machine.Labels[machinev1b1.MachineClusterIDLabel] == "" {
-		return machinecontroller.InvalidMachineConfiguration("%v: missing %q label", machine.GetName(), machinev1b1.MachineClusterIDLabel)
+func validateMachine(machine machinev1beta1.Machine) error {
+	if machine.Labels[machinev1beta1.MachineClusterIDLabel] == "" {
+		return machinecontroller.InvalidMachineConfiguration("%v: missing %q label", machine.GetName(), machinev1beta1.MachineClusterIDLabel)
 	}
 
 	return nil
 }
 
 // getClusterID get cluster ID by machine.openshift.io/cluster-api-cluster label
-func getClusterID(machine *machinev1b1.Machine) (string, bool) {
-	clusterID, ok := machine.Labels[machinev1b1.MachineClusterIDLabel]
+func getClusterID(machine *machinev1beta1.Machine) (string, bool) {
+	clusterID, ok := machine.Labels[machinev1beta1.MachineClusterIDLabel]
 	if !ok {
 		clusterID, ok = machine.Labels[upstreamMachineClusterIDLabel]
 	}
@@ -304,7 +304,7 @@ func stringPointer(str string) *string {
 	return &str
 }
 
-// GetMibValueOfQuality returns the given quantity value in Mib
-func GetMibValueOfQuality(quality resource.Quantity) int64 {
-	return quality.Value() / (1024 * 1024)
+// GetMibValueOfQuantity returns the given quantity value in Mib
+func GetMibValueOfQuantity(quantity resource.Quantity) int64 {
+	return quantity.Value() / (1024 * 1024)
 }

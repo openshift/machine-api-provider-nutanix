@@ -74,7 +74,7 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 				Kind: utils.StringPtr("image"),
 				UUID: imageUuidPtr,
 			},
-			DiskSizeMib: utils.Int64Ptr(GetMibValueOfQuality(mscp.providerSpec.SystemDiskSize)),
+			DiskSizeMib: utils.Int64Ptr(GetMibValueOfQuantity(mscp.providerSpec.SystemDiskSize)),
 		})
 
 		vmMetadata := nutanixClientV3.Metadata{
@@ -86,7 +86,7 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 			HardwareClockTimezone: utils.StringPtr("UTC"),
 			NumVcpusPerSocket:     utils.Int64Ptr(int64(mscp.providerSpec.VCPUsPerSocket)),
 			NumSockets:            utils.Int64Ptr(int64(mscp.providerSpec.VCPUSockets)),
-			MemorySizeMib:         utils.Int64Ptr(GetMibValueOfQuality(mscp.providerSpec.MemorySize)),
+			MemorySizeMib:         utils.Int64Ptr(GetMibValueOfQuantity(mscp.providerSpec.MemorySize)),
 			NicList:               nicList,
 			DiskList:              diskList,
 			GuestCustomization: &nutanixClientV3.GuestCustomization{

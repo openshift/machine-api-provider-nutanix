@@ -26,7 +26,7 @@ import (
 	"k8s.io/klog/v2"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	machinev1b1 "github.com/openshift/api/machine/v1beta1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 )
 
 const (
@@ -63,7 +63,7 @@ func NewActuator(params ActuatorParams) *Actuator {
 
 // Set corresponding event based on error. It also returns the original error
 // for convenience, so callers can do "return handleMachineError(...)".
-func (a *Actuator) handleMachineError(machine *machinev1b1.Machine, err error, eventAction string) error {
+func (a *Actuator) handleMachineError(machine *machinev1beta1.Machine, err error, eventAction string) error {
 	klog.Errorf("error: %v", err)
 	if eventAction != noEventAction {
 		a.eventRecorder.Eventf(machine, corev1.EventTypeWarning, "Failed"+eventAction, "%v", err)
@@ -72,7 +72,7 @@ func (a *Actuator) handleMachineError(machine *machinev1b1.Machine, err error, e
 }
 
 // Create creates a machine and is invoked by the machine controller.
-func (a *Actuator) Create(ctx context.Context, machine *machinev1b1.Machine) error {
+func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) error {
 	klog.Infof("%s: actuator creating machine", machine.GetName())
 
 	scope, err := newMachineScope(machineScopeParams{
@@ -110,7 +110,7 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1b1.Machine) err
 
 // Exists determines if the given machine currently exists.
 // A machine which is not terminated is considered as existing.
-func (a *Actuator) Exists(ctx context.Context, machine *machinev1b1.Machine) (bool, error) {
+func (a *Actuator) Exists(ctx context.Context, machine *machinev1beta1.Machine) (bool, error) {
 	klog.Infof("[Machine: %s]: actuator checking if machine exists", machine.GetName())
 
 	scope, err := newMachineScope(machineScopeParams{
@@ -126,7 +126,7 @@ func (a *Actuator) Exists(ctx context.Context, machine *machinev1b1.Machine) (bo
 }
 
 // Update attempts to sync machine state with an existing instance.
-func (a *Actuator) Update(ctx context.Context, machine *machinev1b1.Machine) error {
+func (a *Actuator) Update(ctx context.Context, machine *machinev1beta1.Machine) error {
 	klog.Infof("%s: actuator updating machine", machine.GetName())
 
 	scope, err := newMachineScope(machineScopeParams{
@@ -175,7 +175,7 @@ func (a *Actuator) Update(ctx context.Context, machine *machinev1b1.Machine) err
 }
 
 // Delete deletes a machine and updates its finalizer
-func (a *Actuator) Delete(ctx context.Context, machine *machinev1b1.Machine) error {
+func (a *Actuator) Delete(ctx context.Context, machine *machinev1beta1.Machine) error {
 	klog.Infof("%s: actuator deleting machine", machine.GetName())
 
 	scope, err := newMachineScope(machineScopeParams{
