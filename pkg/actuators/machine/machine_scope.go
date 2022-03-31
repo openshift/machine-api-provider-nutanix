@@ -125,7 +125,7 @@ func (s *machineScope) getNutanixCredentials() error {
 	err = s.client.Get(s.Context, credsSecretKey, credsSecret)
 	if err != nil {
 		err1 := fmt.Errorf("Could not find the local credentials secret %s: %v", credsSecretKey.Name, err)
-		klog.Errorf("Machine %s: %v", err1.Error())
+		klog.Errorf("Machine %s: %v", s.machine.Name, err1.Error())
 		return err1
 	}
 
