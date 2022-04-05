@@ -81,6 +81,16 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 			Kind:        utils.StringPtr("vm"),
 			SpecVersion: utils.Int64Ptr(1),
 		}
+
+		// Add the category for installer clueanup the VM at cluster torn-down time
+		// if the category exists in PC
+		err = addCategory(mscp, &vmMetadata)
+		if err != nil {
+			klog.Warningf("Failed to add category to the vm. %v", err)
+		} else {
+			klog.Infof("%s: added the category to the vm: %v", mscp.machine.Name, vmMetadata.Categories)
+		}
+
 		vmSpec.Resources = &nutanixClientV3.VMResources{
 			PowerState:            utils.StringPtr("ON"),
 			HardwareClockTimezone: utils.StringPtr("UTC"),
@@ -166,7 +176,7 @@ func findVMByName(ntnxclient *nutanixClientV3.Client, vmName string) (*nutanixCl
 		return nil, err
 	}
 	if len(res.Entities) == 0 {
-		err = fmt.Errorf("Not Found VM by name %s. error: %v", vmName, err)
+		err = fmt.Errorf("Not Found VM by name %s. error: %s", vmName, "VM_NOT_FOUND")
 		klog.Errorf(err.Error())
 		return nil, err
 	}

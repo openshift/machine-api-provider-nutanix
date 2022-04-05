@@ -142,7 +142,7 @@ func (r *Reconciler) delete() error {
 	vmUuid := *r.providerStatus.VmUUID
 	_, err = findVMByUUID(r.nutanixClient, vmUuid)
 	if err != nil {
-		if strings.Contains(err.Error(), "ENTITY_NOT_FOUND") {
+		if strings.Contains(err.Error(), "NOT_FOUND") {
 			klog.Warningf("%v: vm with uuid %s does not exist", r.machine.Name, vmUuid)
 			return nil
 		}
@@ -199,7 +199,7 @@ func (r *Reconciler) exists() (bool, error) {
 	}
 
 	if err != nil {
-		if strings.Contains(err.Error(), "ENTITY_NOT_FOUND") {
+		if strings.Contains(err.Error(), "NOT_FOUND") {
 			return false, nil
 		}
 

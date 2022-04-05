@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix/v3"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
@@ -85,26 +86,39 @@ func NutanixMachineProviderStatusFromRawExtension(rawExtension *runtime.RawExten
 	return providerStatus, nil
 }
 
-// The expected resource description and category (key/value) for the Nutanix resources (ex. vms, images)
+// The expected category (key/value) for the Nutanix resources (ex. vms, images)
 // created for the cluster
 const (
-	NutanixExpectedResourceDescription = "Created By OpenShift Installer"
-	// ExpectedCategoryKey format: "openshift-<cluster-id>"
-	NutanixExpectedCategoryKeyPrefix = "openshift-"
-	NutanixExpectedCategoryValue     = "openshift-ipi-installations"
+	// Expected NutanixCategory Key format: "openshift-<cluster-id>"
+	NutanixCategoryKeyPrefix = "openshift-"
+	NutanixCategoryValue     = "openshift-ipi-installations"
 )
 
-// NutanixExpectedCategory holds a category key/value for the Nutanix resources (ex. vms, images)
-type NutanixExpectedCategory struct {
-	Key   string
-	Value string
-}
-
-func CreateNutanixExpectedCategory(infraID string) *NutanixExpectedCategory {
-	return &NutanixExpectedCategory{
-		Key:   fmt.Sprintf("%s%s", NutanixExpectedCategoryKeyPrefix, infraID),
-		Value: NutanixExpectedCategoryValue,
+// Add the category for installer clueanup the Machine VM at cluster torn-down time
+// if the category exists in PC.
+func addCategory(mscp *machineScope, vmMetadata *nutanixClientV3.Metadata) error {
+	var err error
+	clusterID, ok := getClusterID(mscp.machine)
+	if !ok || clusterID == "" {
+		err = fmt.Errorf("%s: failed to get the clusterID", mscp.machine.Name)
+		klog.Error(err.Error())
+		return err
 	}
+
+	categoryKey := fmt.Sprintf("%s%s", NutanixCategoryKeyPrefix, clusterID)
+	_, err = mscp.nutanixClient.V3.GetCategoryValue(categoryKey, NutanixCategoryValue)
+	if err != nil {
+		klog.Errorf("%s: failed to find the category with key %q and value %q. %v", mscp.machine.Name, categoryKey, NutanixCategoryValue, err)
+		return err
+	}
+
+	// Add the category to the vm metadata
+	if vmMetadata.Categories == nil {
+		vmMetadata.Categories = make(map[string]string, 1)
+	}
+	vmMetadata.Categories[categoryKey] = NutanixCategoryValue
+
+	return nil
 }
 
 // Condition types for an Nutanix VM instance.
