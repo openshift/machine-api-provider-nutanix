@@ -3,7 +3,6 @@ package machine
 import (
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -75,20 +74,24 @@ func newMachineScope(params machineScopeParams) (*machineScope, error) {
 		providerStatus:     providerStatus,
 	}
 
-	if err := mscp.getNutanixCredentials(); err != nil {
-		return nil, fmt.Errorf("failed to get the credentials to access the Nutanix PC: %w", err)
+	clientOptions, err := mscp.getNutanixClientOptions()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get endpoint and/or credentials to access the Nutanix PC: %w", err)
 	}
 
-	nutanixClient, err := clientpkg.Client(clientpkg.ClientOptions{Debug: true})
+	nutanixClient, err := clientpkg.Client(clientOptions)
 	if err != nil {
-		return nil, machineapierrors.InvalidMachineConfiguration("failed to create nutanix client: %v", err.Error())
+		return nil, machineapierrors.InvalidMachineConfiguration("failed to create nutanix client: %w", err.Error())
 	}
 
 	mscp.nutanixClient = nutanixClient
 	return mscp, nil
 }
 
-func (s *machineScope) getNutanixCredentials() error {
+func (s *machineScope) getNutanixClientOptions() (*clientpkg.ClientOptions, error) {
+
+	clientOptions := &clientpkg.ClientOptions{Debug: true}
+
 	// Get the PC endpoint/port from the Infrastructure CR
 	infra := &configv1.Infrastructure{}
 	infraKey := runtimeclient.ObjectKey{
@@ -96,25 +99,25 @@ func (s *machineScope) getNutanixCredentials() error {
 	}
 	err := s.client.Get(s.Context, infraKey, infra)
 	if err != nil {
-		err1 := fmt.Errorf("Could not find the Infrastruture object %q: %v", infraKey.Name, err)
-		klog.Errorf("Machine %s: %v", s.machine.Name, err1.Error())
-		return err1
+		err1 := fmt.Errorf("Could not find the Infrastruture object %q: %w", infraKey.Name, err)
+		klog.Errorf("Machine %q: %v", s.machine.Name, err1.Error())
+		return nil, err1
 	}
 
-	// Set the corresponding environment variable
 	pcEndpoint := infra.Spec.PlatformSpec.Nutanix.PrismCentral.Address
 	pcPort := infra.Spec.PlatformSpec.Nutanix.PrismCentral.Port
 	if len(pcEndpoint) == 0 {
-		return fmt.Errorf("The prismCentralEndpoint field is not set in the Infrastreucture CR")
+		return nil, fmt.Errorf("The prismCentralEndpoint field is not set in the Infrastreucture CR")
 	}
-	os.Setenv(clientpkg.NutanixEndpointKey, pcEndpoint)
+	clientOptions.Credentials.Endpoint = pcEndpoint
+
 	if pcPort < 1 || pcPort > 65535 {
-		return fmt.Errorf("The pcPort field is not set right in the Infrastreucture CR: %d", pcPort)
+		return nil, fmt.Errorf("The pcPort field is not set right in the Infrastreucture CR: %d", pcPort)
 	}
-	os.Setenv(clientpkg.NutanixPortKey, strconv.Itoa(int(pcPort)))
+	clientOptions.Credentials.Port = strconv.Itoa(int(pcPort))
 
 	if s.providerSpec.CredentialsSecret == nil || len(s.providerSpec.CredentialsSecret.Name) == 0 {
-		return fmt.Errorf("The nutanix providerSpec credentialsSecret reference is not set.")
+		return nil, fmt.Errorf("The nutanix providerSpec credentialsSecret reference is not set.")
 	}
 	credsSecretName := s.providerSpec.CredentialsSecret.Name
 	credsSecret := &corev1.Secret{}
@@ -124,24 +127,24 @@ func (s *machineScope) getNutanixCredentials() error {
 	}
 	err = s.client.Get(s.Context, credsSecretKey, credsSecret)
 	if err != nil {
-		err1 := fmt.Errorf("Could not find the local credentials secret %s: %v", credsSecretKey.Name, err)
-		klog.Errorf("Machine %s: %v", s.machine.Name, err1.Error())
-		return err1
+		err1 := fmt.Errorf("Could not find the local credentials secret %s: %w", credsSecretKey.Name, err)
+		klog.Errorf("Machine %q: %v", s.machine.Name, err1.Error())
+		return nil, err1
 	}
 
 	if username, ok := credsSecret.Data[clientpkg.NutanixUserKey]; ok {
-		os.Setenv(clientpkg.NutanixUserKey, string(username))
+		clientOptions.Credentials.Username = string(username)
 	} else {
-		return fmt.Errorf("The PC username is not available from the local secret %s", credsSecret.Name)
+		return nil, fmt.Errorf("The PC username is not available from the local secret %s", credsSecret.Name)
 	}
 
 	if password, ok := credsSecret.Data[clientpkg.NutanixPasswordKey]; ok {
-		os.Setenv(clientpkg.NutanixPasswordKey, string(password))
+		clientOptions.Credentials.Password = string(password)
 	} else {
-		return fmt.Errorf("The PC password is not available from the local secret %s", credsSecret.Name)
+		return nil, fmt.Errorf("The PC password is not available from the local secret %s", credsSecret.Name)
 	}
 
-	return nil
+	return clientOptions, nil
 }
 
 // Patch patches the machine spec and machine status after reconciling.
@@ -158,7 +161,7 @@ func (s *machineScope) patchMachine() error {
 
 	// patch machine
 	if err := s.client.Patch(s.Context, s.machine, s.machineToBePatched); err != nil {
-		e1 := fmt.Errorf("Failed to patch machine %q: %v", s.machine.GetName(), err)
+		e1 := fmt.Errorf("Failed to patch machine %q: %w", s.machine.GetName(), err)
 		klog.Error(e1.Error())
 		return e1
 	}
@@ -167,7 +170,7 @@ func (s *machineScope) patchMachine() error {
 
 	// patch status
 	if err := s.client.Status().Patch(context.Background(), s.machine, s.machineToBePatched); err != nil {
-		e1 := fmt.Errorf("Failed to patch machine status %q: %v", s.machine.GetName(), err)
+		e1 := fmt.Errorf("%s: failed to patch machine status. %w", s.machine.GetName(), err)
 		klog.Error(e1.Error())
 		return e1
 	}
@@ -258,10 +261,10 @@ func (s *machineScope) getNode() (*corev1.Node, error) {
 	err := s.client.Get(s.Context, nodeKey, &node)
 	if err != nil {
 		if apimachineryerrors.IsNotFound(err) {
-			klog.Infof("[Machine: %s] Node %q not found", s.machine.Name, nodeName)
+			klog.Infof("%s: Node %q not found", s.machine.Name, nodeName)
 			return nil, err
 		}
-		klog.Errorf("[Machine: %s] Failed to get node %q: %v", s.machine.Name, nodeName, err)
+		klog.Errorf("%s: failed to get node %q. %v", s.machine.Name, nodeName, err)
 		return nil, err
 	}
 

@@ -2,9 +2,7 @@ package machine
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -97,19 +95,14 @@ func TestMachineEvents(t *testing.T) {
 		g.Expect(k8sClient.Delete(ctx, testNs)).To(Succeed())
 	}()
 
-	user, err := base64.StdEncoding.DecodeString(os.Getenv("Nutanix_PrismCentral_User"))
-	g.Expect(err).ToNot(HaveOccurred())
-	password, err := base64.StdEncoding.DecodeString(os.Getenv("Nutanix_PrismCentral_Password"))
-	g.Expect(err).ToNot(HaveOccurred())
-
 	credsSecret := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      NutanixCredentialsSecretName,
 			Namespace: testNsName,
 		},
 		Data: map[string][]byte{
-			clientpkg.NutanixUserKey:     user,
-			clientpkg.NutanixPasswordKey: password,
+			clientpkg.NutanixUserKey:     []byte("user1"),
+			clientpkg.NutanixPasswordKey: []byte("password1"),
 		},
 	}
 	g.Expect(k8sClient.Create(ctx, &credsSecret)).To(Succeed())
@@ -132,7 +125,6 @@ func TestMachineEvents(t *testing.T) {
 		g.Expect(k8sClient.Delete(ctx, userDataSecret)).To(Succeed())
 	}()
 
-	//var vmUuid *string
 	cases := []struct {
 		name        string
 		machineName string
@@ -157,20 +149,6 @@ func TestMachineEvents(t *testing.T) {
 			},
 			event: "missing \"machine.openshift.io/cluster-api-cluster\" label",
 		},
-		/*{
-			name:        "Create machine succeed",
-			machineName: "test-machine",
-			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
-				actuator.Create(ctx, machine)
-				providerStatus, err1 := NutanixMachineProviderStatusFromRawExtension(machine.Status.ProviderStatus)
-				g.Expect(err1).ToNot(HaveOccurred())
-				vmUuid = providerStatus.VmUUID
-				g.Expect(vmUuid).NotTo(BeNil())
-				g.Expect(machine.Spec.ProviderID).NotTo(BeNil())
-				g.Expect(machine.Status.Addresses).To(HaveLen(2))
-			},
-			event: "Created Machine",
-		},*/
 		{
 			name:        "Update machine failed on invalid machine scope",
 			machineName: "test-machine",
@@ -188,21 +166,6 @@ func TestMachineEvents(t *testing.T) {
 			},
 			event: "missing \"machine.openshift.io/cluster-api-cluster\" label",
 		},
-		/*{
-			name:        "Update machine succeed",
-			machineName: "test-machine",
-			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
-				g.Expect(vmUuid).NotTo(BeNil())
-				providerStatus, err1 := NutanixMachineProviderStatusFromRawExtension(machine.Status.ProviderStatus)
-				g.Expect(err1).ToNot(HaveOccurred())
-				providerStatus.VmUUID = vmUuid
-				rawProviderStatus, err1 := RawExtensionFromNutanixMachineProviderStatus(providerStatus)
-				g.Expect(err1).ToNot(HaveOccurred())
-				machine.Status.ProviderStatus = rawProviderStatus
-				actuator.Update(ctx, machine)
-			},
-			event: "Updated Machine",
-		},*/
 		{
 			name:        "Delete machine event failed on invalid machine scope",
 			machineName: "test-machine",
@@ -211,21 +174,6 @@ func TestMachineEvents(t *testing.T) {
 			},
 			event: "context and machine should not be nil",
 		},
-		/*{
-			name:        "Delete machine succeed",
-			machineName: "test-machine",
-			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
-				g.Expect(vmUuid).NotTo(BeNil())
-				providerStatus, err1 := NutanixMachineProviderStatusFromRawExtension(machine.Status.ProviderStatus)
-				g.Expect(err1).ToNot(HaveOccurred())
-				providerStatus.VmUUID = vmUuid
-				rawProviderStatus, err1 := RawExtensionFromNutanixMachineProviderStatus(providerStatus)
-				g.Expect(err1).ToNot(HaveOccurred())
-				machine.Status.ProviderStatus = rawProviderStatus
-				actuator.Delete(ctx, machine)
-			},
-			event: "Deleted machine",
-		},*/
 	}
 
 	for _, tc := range cases {

@@ -30,25 +30,33 @@ const (
 )
 
 type ClientOptions struct {
-	Debug bool
+	Credentials *nutanixClient.Credentials
+	Debug       bool
 }
 
-func Client(options ClientOptions) (*nutanixClientV3.Client, error) {
-	username := getEnvVar(NutanixUserKey)
-	password := getEnvVar(NutanixPasswordKey)
-	port := getEnvVar(NutanixPortKey)
-	endpoint := getEnvVar(NutanixEndpointKey)
-	cred := nutanixClient.Credentials{
-		URL:      fmt.Sprintf("%s:%s", endpoint, port),
-		Username: username,
-		Password: password,
-		Port:     port,
-		Endpoint: endpoint,
-		Insecure: true,
+func Client(options *ClientOptions) (*nutanixClientV3.Client, error) {
+	if options.Credentials == nil {
+		username := getEnvVar(NutanixUserKey)
+		password := getEnvVar(NutanixPasswordKey)
+		port := getEnvVar(NutanixPortKey)
+		endpoint := getEnvVar(NutanixEndpointKey)
+		options.Credentials = &nutanixClient.Credentials{
+			Username: username,
+			Password: password,
+			Port:     port,
+			Endpoint: endpoint,
+		}
 	}
 
-	klog.Infof("To create nutanixClient with creds: (url: %s, insecure: %v)", cred.URL, cred.Insecure)
-	cli, err := nutanixClientV3.NewV3Client(cred, options.Debug)
+	if len(options.Credentials.URL) == 0 {
+		options.Credentials.URL = fmt.Sprintf("%s:%s", options.Credentials.Endpoint, options.Credentials.Port)
+	}
+
+	// FIXME: Use insure connection for now. Will change to use secure connection later
+	options.Credentials.Insecure = true
+
+	klog.Infof("To create nutanixClient with creds: (url: %s, insecure: %v)", options.Credentials.URL, options.Credentials.Insecure)
+	cli, err := nutanixClientV3.NewV3Client(*options.Credentials, options.Debug)
 	if err != nil {
 		klog.Errorf("Failed to create the nutanix client. error: %v", err)
 		return nil, err

@@ -86,9 +86,9 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 		// if the category exists in PC
 		err = addCategory(mscp, &vmMetadata)
 		if err != nil {
-			klog.Warningf("Failed to add category to the vm. %v", err)
+			klog.Warningf("Failed to add category to the vm %q. %v", vmName, err)
 		} else {
-			klog.Infof("%s: added the category to the vm: %v", mscp.machine.Name, vmMetadata.Categories)
+			klog.Infof("%s: added the category to the vm %q: %v", mscp.machine.Name, vmName, vmMetadata.Categories)
 		}
 
 		vmSpec.Resources = &nutanixClientV3.VMResources{
@@ -127,7 +127,7 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 			return nil, err
 		}
 		vmUuid = *vm.Metadata.UUID
-		klog.Infof("Sent the post request to create VM %s. Got the vm UUID: %s, status.state: %s",
+		klog.Infof("Sent the post request to create VM %q. Got the vm UUID: %s, status.state: %s",
 			vmName, vmUuid, *vm.Status.State)
 		// Wait for some time for the VM getting ready
 		time.Sleep(10 * time.Second)
@@ -137,7 +137,7 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 	err = clientpkg.WaitForGetVMComplete(mscp.nutanixClient, vmUuid)
 	if err != nil {
 		klog.Errorf("Failed to get the vm with UUID %s. error: %v", vmUuid, err)
-		return nil, fmt.Errorf("Error retriving the created vm %s", vmName)
+		return nil, fmt.Errorf("Error retriving the created vm %q", vmName)
 	}
 
 	vm, err = findVMByUUID(mscp.nutanixClient, vmUuid)
@@ -145,7 +145,7 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 		klog.Errorf("Failed to find the vm with UUID %s. %v", vmUuid, err)
 		return nil, err
 	}
-	klog.Infof("The vm is ready. vmUUID: %s, vmState: %s", vmUuid, *vm.Status.State)
+	klog.Infof("The vm %q is ready. vmUUID: %s, vmState: %s", vmName, vmUuid, *vm.Status.State)
 
 	return vm, nil
 }
@@ -165,18 +165,18 @@ func findVMByUUID(ntnxclient *nutanixClientV3.Client, uuid string) (*nutanixClie
 
 // findVMByName retrieves the VM with the given vm name
 func findVMByName(ntnxclient *nutanixClientV3.Client, vmName string) (*nutanixClientV3.VMIntentResponse, error) {
-	klog.Infof("Checking if VM with name %s exists.", vmName)
+	klog.Infof("Checking if VM with name %q exists.", vmName)
 
 	res, err := ntnxclient.V3.ListVM(&nutanixClientV3.DSMetadata{
 		Filter: utils.StringPtr(fmt.Sprintf("vm_name==%s", vmName))})
 
 	if err != nil {
-		err = fmt.Errorf("Error when finding VM by name %s. error: %v", vmName, err)
+		err = fmt.Errorf("Error when finding VM by name %s. error: %w", vmName, err)
 		klog.Errorf(err.Error())
 		return nil, err
 	}
 	if len(res.Entities) == 0 {
-		err = fmt.Errorf("Not Found VM by name %s. error: %s", vmName, "VM_NOT_FOUND")
+		err = fmt.Errorf("Not Found VM by name %q. error: VM_NOT_FOUND", vmName)
 		klog.Errorf(err.Error())
 		return nil, err
 	}
@@ -202,7 +202,7 @@ func deleteVM(ntnxclient *nutanixClientV3.Client, vmUUID string) error {
 
 	_, err := ntnxclient.V3.DeleteVM(vmUUID)
 	if err != nil {
-		klog.Infof("Error deleting vm with uuid %s", vmUUID)
+		klog.Errorf("Error deleting vm with uuid %s. %v", vmUUID, err)
 		return err
 	}
 
@@ -228,7 +228,7 @@ func findClusterUuidByName(ntnxclient *nutanixClientV3.Client, clusterName strin
 		Filter: utils.StringPtr(fmt.Sprintf("name==%s", clusterName)),
 	})
 	if err != nil || len(res.Entities) == 0 {
-		e1 := fmt.Errorf("Failed to find cluster by name %q. error: %v", clusterName, err)
+		e1 := fmt.Errorf("Failed to find cluster by name %q. error: %w", clusterName, err)
 		klog.Errorf(e1.Error())
 		return nil, e1
 	}
@@ -249,7 +249,7 @@ func findImageUuidByName(ntnxclient *nutanixClientV3.Client, imageName string) (
 		Filter: utils.StringPtr(fmt.Sprintf("name==%s", imageName)),
 	})
 	if err != nil || len(res.Entities) == 0 {
-		e1 := fmt.Errorf("Failed to find image by name %q. error: %v", imageName, err)
+		e1 := fmt.Errorf("Failed to find image by name %q. error: %w", imageName, err)
 		klog.Errorf(e1.Error())
 		return nil, e1
 	}
@@ -263,14 +263,14 @@ func findImageUuidByName(ntnxclient *nutanixClientV3.Client, imageName string) (
 
 // findSubenetUuidByName retrieves the subnet uuid by the given subnet name
 func findSubenetUuidByName(ntnxclient *nutanixClientV3.Client, subnetName string) (*string, error) {
-	klog.Infof("Checking if subnet with name %s exists.", subnetName)
+	klog.Infof("Checking if subnet with name %q exists.", subnetName)
 
 	res, err := ntnxclient.V3.ListSubnet(&nutanixClientV3.DSMetadata{
 		//Kind: utils.StringPtr("subnet"),
 		Filter: utils.StringPtr(fmt.Sprintf("name==%s", subnetName)),
 	})
 	if err != nil || len(res.Entities) == 0 {
-		e1 := fmt.Errorf("Failed to find subnet by name %q. error: %v", subnetName, err)
+		e1 := fmt.Errorf("Failed to find subnet by name %q. error: %w", subnetName, err)
 		klog.Errorf(e1.Error())
 		return nil, e1
 	}

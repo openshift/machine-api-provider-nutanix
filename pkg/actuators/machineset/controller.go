@@ -82,7 +82,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	if err := r.Client.Patch(ctx, machineSet, originalMachineSetToPatch); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to patch machineSet: %v", err)
+		return ctrl.Result{}, fmt.Errorf("failed to patch machineSet: %w", err)
 	}
 
 	if isInvalidConfigurationError(err) {

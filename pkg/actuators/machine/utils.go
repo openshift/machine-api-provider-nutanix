@@ -31,7 +31,7 @@ func RawExtensionFromNutanixMachineProviderSpec(spec *machinev1.NutanixMachinePr
 	var rawBytes []byte
 	var err error
 	if rawBytes, err = json.Marshal(spec); err != nil {
-		return nil, fmt.Errorf("error marshalling providerSpec: %v", err)
+		return nil, fmt.Errorf("error marshalling providerSpec: %w", err)
 	}
 
 	return &runtime.RawExtension{
@@ -48,7 +48,7 @@ func RawExtensionFromNutanixMachineProviderStatus(status *machinev1.NutanixMachi
 	var rawBytes []byte
 	var err error
 	if rawBytes, err = json.Marshal(status); err != nil {
-		return nil, fmt.Errorf("error marshalling providerStatus: %v", err)
+		return nil, fmt.Errorf("error marshalling providerStatus: %w", err)
 	}
 
 	return &runtime.RawExtension{
@@ -64,7 +64,7 @@ func NutanixMachineProviderSpecFromRawExtension(rawExtension *runtime.RawExtensi
 
 	spec := new(machinev1.NutanixMachineProviderConfig)
 	if err := json.Unmarshal(rawExtension.Raw, &spec); err != nil {
-		return nil, fmt.Errorf("error unmarshalling providerSpec: %v", err)
+		return nil, fmt.Errorf("error unmarshalling providerSpec: %w", err)
 	}
 
 	klog.V(5).Infof("Got provider Spec from raw extension: %+v", spec)
@@ -79,7 +79,7 @@ func NutanixMachineProviderStatusFromRawExtension(rawExtension *runtime.RawExten
 
 	providerStatus := new(machinev1.NutanixMachineProviderStatus)
 	if err := json.Unmarshal(rawExtension.Raw, providerStatus); err != nil {
-		return nil, fmt.Errorf("error unmarshalling providerStatus: %v", err)
+		return nil, fmt.Errorf("error unmarshalling providerStatus: %w", err)
 	}
 
 	klog.V(5).Infof("Got provider Status from raw extension: %+v", providerStatus)

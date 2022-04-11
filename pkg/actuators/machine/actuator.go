@@ -111,7 +111,7 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 // Exists determines if the given machine currently exists.
 // A machine which is not terminated is considered as existing.
 func (a *Actuator) Exists(ctx context.Context, machine *machinev1beta1.Machine) (bool, error) {
-	klog.Infof("[Machine: %s]: actuator checking if machine exists", machine.GetName())
+	klog.Infof("%s: actuator checking if machine exists", machine.GetName())
 
 	scope, err := newMachineScope(machineScopeParams{
 		Context:             ctx,
