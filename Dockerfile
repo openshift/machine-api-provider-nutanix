@@ -1,3 +1,4 @@
+
 FROM registry.ci.openshift.org/openshift/release:golang-1.17 AS builder
 WORKDIR /go/src/github.com/openshift/machine-api-provider-nutanix
 COPY . .
@@ -5,5 +6,5 @@ COPY . .
 #RUN NO_DOCKER=1 make build
 RUN unset VERSION && GOPROXY=off NO_DOCKER=1 make build
 
-FROM registry.ci.openshift.org/openshift/origin-v4.0:base
+FROM registry.ci.openshift.org/ocp/4.11:base
 COPY --from=builder /go/src/github.com/openshift/machine-api-provider-nutanix/bin/machine-controller-manager /
