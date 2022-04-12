@@ -8,6 +8,7 @@ import (
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
+	clientpkg "github.com/openshift/machine-api-provider-nutanix/pkg/client"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -119,6 +120,78 @@ func addCategory(mscp *machineScope, vmMetadata *nutanixClientV3.Metadata) error
 	vmMetadata.Categories[categoryKey] = NutanixCategoryValue
 
 	return nil
+}
+
+// Nutanix Credentials
+type CredentialType string
+
+const (
+	BasicAuthCredentialType CredentialType = "basic_auth"
+)
+
+type NutanixCredentials struct {
+	Credentials []Credential `json:"credentials"`
+}
+
+type Credential struct {
+	Type CredentialType        `json:"type"`
+	Data *runtime.RawExtension `json:"data"`
+}
+
+type BasicAuthCredential struct {
+	// The Basic Auth (username, password) for the Prism Central
+	PrismCentral PrismCentralBasicAuth `json:"prismCentral"`
+
+	// The Basic Auth (username, password) for the Prism Elements (clusters).
+	// Currently only one Prism Element (cluster) is used for each openshift cluster.
+	// Later this may spread to multiple Prism Element (cluster).
+	PrismElements []PrismElementBasicAuth `json:"prismElements"`
+}
+
+type PrismCentralBasicAuth struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type PrismElementBasicAuth struct {
+	Name     string `json:"name"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// setClientCredentials sets the Prism Central credentials to the clientOptions with the given credentials data
+func setClientCredentials(credsData []byte, clientOptions *clientpkg.ClientOptions) error {
+	creds := &NutanixCredentials{}
+	err := json.Unmarshal(credsData, &creds.Credentials)
+	if err != nil {
+		err1 := fmt.Errorf("Failed to unmarshal the credentials data. %w", err)
+		klog.Errorf(err1.Error())
+		return err1
+	}
+
+	// Currently we only support the "basic_auth" credentials type.
+	for _, cred := range creds.Credentials {
+		switch cred.Type {
+		case BasicAuthCredentialType:
+			basicAuthCreds := BasicAuthCredential{}
+			if err := json.Unmarshal(cred.Data.Raw, &basicAuthCreds); err != nil {
+				return fmt.Errorf("Failed to unmarshal the basic-auth data. %w", err)
+			}
+			if basicAuthCreds.PrismCentral.Username == "" || basicAuthCreds.PrismCentral.Password == "" {
+				return fmt.Errorf("The PrismCentral credentials data is not set.")
+			}
+
+			clientOptions.Credentials.Username = basicAuthCreds.PrismCentral.Username
+			clientOptions.Credentials.Password = basicAuthCreds.PrismCentral.Password
+			klog.Infof("Successfully set the PrismCentral credentials to the clientOptions to create the Prism Central client.")
+			return nil
+
+		default:
+			return fmt.Errorf("Unsupported credentials type: %v", cred.Type)
+		}
+	}
+
+	return fmt.Errorf("The PrismCentral credentials data is not availaible.")
 }
 
 // Condition types for an Nutanix VM instance.

@@ -136,16 +136,13 @@ func (s *machineScope) getNutanixClientOptions() (*clientpkg.ClientOptions, erro
 		return nil, err1
 	}
 
-	if username, ok := credsSecret.Data[clientpkg.NutanixUserKey]; ok {
-		clientOptions.Credentials.Username = string(username)
-	} else {
-		return nil, fmt.Errorf("The PC username is not available from the local secret %s", credsSecret.Name)
+	credentialsData, ok := credsSecret.Data["credentials"]
+	if !ok {
+		return nil, fmt.Errorf("No credentials data found in the local secret %q", credsSecret.Name)
 	}
 
-	if password, ok := credsSecret.Data[clientpkg.NutanixPasswordKey]; ok {
-		clientOptions.Credentials.Password = string(password)
-	} else {
-		return nil, fmt.Errorf("The PC password is not available from the local secret %s", credsSecret.Name)
+	if err = setClientCredentials(credentialsData, clientOptions); err != nil {
+		return nil, fmt.Errorf("Failed to get the credentials data to create the PC client. %w", err)
 	}
 
 	return clientOptions, nil

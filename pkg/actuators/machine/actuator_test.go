@@ -19,12 +19,13 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
-	clientpkg "github.com/openshift/machine-api-provider-nutanix/pkg/client"
 )
 
 const (
 	// NutanixCredentialsSecretName is the name of the secret holding the credentials for PC client
 	NutanixCredentialsSecretName = "nutanix-credentials"
+
+	credentialsData = `[{"type":"basic_auth","data":{"prismCentral":{"username":"pc_user","password":"pc_password"},"prismElements":[{"name":"pe_name","username":"pe_user","password":"pe_password"}]}}]`
 )
 
 func init() {
@@ -100,8 +101,7 @@ func TestMachineEvents(t *testing.T) {
 			Namespace: testNsName,
 		},
 		Data: map[string][]byte{
-			clientpkg.NutanixUserKey:     []byte("user1"),
-			clientpkg.NutanixPasswordKey: []byte("password1"),
+			"credentials": []byte(credentialsData),
 		},
 	}
 	g.Expect(k8sClient.Create(ctx, &credsSecret)).To(Succeed())
