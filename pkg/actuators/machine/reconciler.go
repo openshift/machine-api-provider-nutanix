@@ -208,7 +208,7 @@ func (r *Reconciler) exists() (bool, error) {
 			Namespace: r.machine.Namespace,
 			Reason:    err.Error(),
 		})
-		klog.Errorf("%s: error finding the vm: %v", r.machine.Name, err)
+		klog.Errorf("%s: error finding the vm: %w", r.machine.Name, err)
 		return false, err
 	}
 
