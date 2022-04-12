@@ -67,7 +67,7 @@ func NutanixMachineProviderSpecFromRawExtension(rawExtension *runtime.RawExtensi
 		return nil, fmt.Errorf("error unmarshalling providerSpec: %w", err)
 	}
 
-	klog.V(5).Infof("Got provider Spec from raw extension: %+v", spec)
+	klog.V(5).Infof("Got provider Spec from raw extension: %+v", *spec)
 	return spec, nil
 }
 

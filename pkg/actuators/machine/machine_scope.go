@@ -81,7 +81,7 @@ func newMachineScope(params machineScopeParams) (*machineScope, error) {
 
 	nutanixClient, err := clientpkg.Client(clientOptions)
 	if err != nil {
-		return nil, machineapierrors.InvalidMachineConfiguration("failed to create nutanix client: %w", err.Error())
+		return nil, machineapierrors.InvalidMachineConfiguration("failed to create nutanix client: %w", err)
 	}
 
 	mscp.nutanixClient = nutanixClient
