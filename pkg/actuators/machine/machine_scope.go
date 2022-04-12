@@ -11,6 +11,7 @@ import (
 	machineapierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	clientpkg "github.com/openshift/machine-api-provider-nutanix/pkg/client"
 
+	nutanixClient "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix"
 	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix/v3"
 	corev1 "k8s.io/api/core/v1"
 	apimachineryerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -90,7 +91,10 @@ func newMachineScope(params machineScopeParams) (*machineScope, error) {
 
 func (s *machineScope) getNutanixClientOptions() (*clientpkg.ClientOptions, error) {
 
-	clientOptions := &clientpkg.ClientOptions{Debug: true}
+	clientOptions := &clientpkg.ClientOptions{
+		Credentials: &nutanixClient.Credentials{},
+		Debug:       true,
+	}
 
 	// Get the PC endpoint/port from the Infrastructure CR
 	infra := &configv1.Infrastructure{}
