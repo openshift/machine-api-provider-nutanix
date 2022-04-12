@@ -108,7 +108,7 @@ func addCategory(mscp *machineScope, vmMetadata *nutanixClientV3.Metadata) error
 	categoryKey := fmt.Sprintf("%s%s", NutanixCategoryKeyPrefix, clusterID)
 	_, err = mscp.nutanixClient.V3.GetCategoryValue(categoryKey, NutanixCategoryValue)
 	if err != nil {
-		klog.Errorf("%s: failed to find the category with key %q and value %q. %v", mscp.machine.Name, categoryKey, NutanixCategoryValue, err)
+		klog.Errorf("%s: failed to find the category with key %q and value %q. %w", mscp.machine.Name, categoryKey, NutanixCategoryValue, err)
 		return err
 	}
 

@@ -3,7 +3,6 @@ package machine
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -63,12 +62,12 @@ func TestMachineEvents(t *testing.T) {
 	defer func() {
 		g.Expect(k8sClient.Delete(ctx, infra)).To(Succeed())
 	}()
-	g.Expect(strings.EqualFold(infra.Spec.PlatformSpec.Nutanix.PrismCentral.Address, "10.40.142.15")).Should(BeTrue())
-	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismCentral.Port == 9440).Should(BeTrue())
-	g.Expect(len(infra.Spec.PlatformSpec.Nutanix.PrismElements) == 1).Should(BeTrue())
-	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismElements[0].Name == "ganon").Should(BeTrue())
-	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismElements[0].Endpoint.Address == "10.40.231.131").Should(BeTrue())
-	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismElements[0].Endpoint.Port == 9440).Should(BeTrue())
+	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismCentral.Address).Should(Equal("10.40.142.15"))
+	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismCentral.Port).Should(Equal(9440))
+	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismElements).Should(HaveLen(1))
+	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismElements[0].Name).Should(Equal("ganon"))
+	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismElements[0].Endpoint.Address).Should(Equal("10.40.231.131"))
+	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismElements[0].Endpoint.Port).Should(Equal(9440))
 
 	// Update the infrastructure status
 	infra.Status.InfrastructureName = "test-cluster-1"

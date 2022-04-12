@@ -202,7 +202,7 @@ func deleteVM(ntnxclient *nutanixClientV3.Client, vmUUID string) error {
 
 	_, err := ntnxclient.V3.DeleteVM(vmUUID)
 	if err != nil {
-		klog.Errorf("Error deleting vm with uuid %s. %v", vmUUID, err)
+		klog.Errorf("Error deleting vm with uuid %s. %w", vmUUID, err)
 		return err
 	}
 
