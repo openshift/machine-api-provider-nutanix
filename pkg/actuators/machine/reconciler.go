@@ -53,8 +53,8 @@ func (r *Reconciler) create() error {
 
 	vm, err := createVM(r.machineScope, userData)
 	if err != nil {
-		klog.Errorf("%s: error creating machine vm: %w", r.machine.Name, err)
-		r.machineScope.setProviderStatus(nil, conditionFailed(MachineCreation, err.Error()))
+		klog.Errorf("%s: error creating machine vm. error: %v", r.machine.Name, err)
+		r.machineScope.setProviderStatus(nil, conditionFailed(machineCreation, err.Error()))
 		return fmt.Errorf("failed to create VM: %w", err)
 	}
 
@@ -63,7 +63,7 @@ func (r *Reconciler) create() error {
 		return fmt.Errorf("failed to update machine with vm state: %w", err)
 	}
 
-	r.machineScope.setProviderStatus(vm, conditionSuccess(MachineCreation))
+	r.machineScope.setProviderStatus(vm, conditionSuccess(machineCreation))
 
 	return nil
 }
@@ -87,9 +87,9 @@ func (r *Reconciler) update() error {
 				Namespace: r.machine.Namespace,
 				Reason:    err.Error(),
 			})
-			klog.Errorf("%s: error finding the vm with name %q: %w", r.machine.Name, r.machine.Name, err)
+			klog.Errorf("%s: error finding the vm with name %q. error: %v", r.machine.Name, r.machine.Name, err)
 
-			r.machineScope.setProviderStatus(nil, conditionFailed(MachineUpdate, err.Error()))
+			r.machineScope.setProviderStatus(nil, conditionFailed(machineUpdate, err.Error()))
 			return err
 		}
 		r.providerStatus.VmUUID = vm.Metadata.UUID
@@ -104,9 +104,9 @@ func (r *Reconciler) update() error {
 				Namespace: r.machine.Namespace,
 				Reason:    err.Error(),
 			})
-			klog.Errorf("%s: error finding the vm with uuid %s: %w", r.machine.Name, vmUuid, err)
+			klog.Errorf("%s: error finding the vm with uuid %s. error: %v", r.machine.Name, vmUuid, err)
 
-			r.machineScope.setProviderStatus(nil, conditionFailed(MachineUpdate, err.Error()))
+			r.machineScope.setProviderStatus(nil, conditionFailed(machineUpdate, err.Error()))
 			return err
 		}
 	}
@@ -117,13 +117,13 @@ func (r *Reconciler) update() error {
 			Namespace: r.machine.Namespace,
 			Reason:    err.Error(),
 		})
-		klog.Errorf("%s: error update machine with VM state: %w", r.machine.Name, err)
+		klog.Errorf("%s: error update machine with VM state. error: %v", r.machine.Name, err)
 
-		r.machineScope.setProviderStatus(vm, conditionFailed(MachineUpdate, err.Error()))
+		r.machineScope.setProviderStatus(vm, conditionFailed(machineUpdate, err.Error()))
 		return err
 	}
 
-	r.machineScope.setProviderStatus(vm, conditionSuccess(MachineUpdate))
+	r.machineScope.setProviderStatus(vm, conditionSuccess(machineUpdate))
 
 	klog.Infof("%s: updated machine vm state", r.machine.Name)
 	return nil
@@ -170,7 +170,7 @@ func (r *Reconciler) delete() error {
 			Namespace: r.machine.Namespace,
 			Reason:    err.Error(),
 		})
-		klog.Errorf("%s: error deleting vm with uuid %s: %w", r.machine.Name, vmUuid, err)
+		klog.Errorf("%s: error deleting vm with uuid %s. error: %v", r.machine.Name, vmUuid, err)
 		return err
 	}
 
@@ -276,7 +276,7 @@ func (r *Reconciler) setProviderID(vmUUID *string) error {
 		node.Spec.ProviderID = providerID
 		err := r.client.Update(r.Context, node)
 		if err != nil {
-			klog.Errorf("%s: failed to update the node %q spec.providerID. %w", r.machine.Name, nodeName, err)
+			klog.Errorf("%s: failed to update the node %q spec.providerID. error: %v", r.machine.Name, nodeName, err)
 			return err
 		}
 		klog.Infof("%s: The node %q spec.providerID is set to: %s", r.machine.Name, nodeName, providerID)

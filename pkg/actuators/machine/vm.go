@@ -36,7 +36,7 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 		userdataEncoded := base64.StdEncoding.EncodeToString(userData)
 
 		// Create the VM
-		klog.Infof("To create VM with name %q, and providerSpec: %+v", vmName, *mscp.providerSpec)
+		klog.V(5).Infof("To create VM with name %q, and providerSpec: %+v", vmName, *mscp.providerSpec)
 		vmInput := nutanixClientV3.VMIntentInput{}
 		vmSpec := nutanixClientV3.VM{Name: utils.StringPtr(vmName)}
 
@@ -202,7 +202,7 @@ func deleteVM(ntnxclient *nutanixClientV3.Client, vmUUID string) error {
 
 	_, err := ntnxclient.V3.DeleteVM(vmUUID)
 	if err != nil {
-		klog.Errorf("Error deleting vm with uuid %s. %w", vmUUID, err)
+		klog.Errorf("Error deleting vm with uuid %s. error: %v", vmUUID, err)
 		return err
 	}
 

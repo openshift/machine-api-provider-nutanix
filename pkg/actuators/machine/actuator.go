@@ -88,7 +88,7 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 
 	if err := newReconciler(scope).create(); err != nil {
 		// Update providerStatus conditions
-		cond1 := conditionFailed(MachineCreation, err.Error())
+		cond1 := conditionFailed(machineCreation, err.Error())
 		cond2 := conditionInstanceReady(metav1.ConditionFalse)
 		scope.providerStatus.Conditions = setNutanixProviderConditions([]metav1.Condition{cond1, cond2}, scope.providerStatus.Conditions)
 
@@ -100,7 +100,7 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 	}
 
 	// Update providerStatus conditions
-	cond1 := conditionSuccess(MachineCreation)
+	cond1 := conditionSuccess(machineCreation)
 	cond2 := conditionInstanceReady(metav1.ConditionTrue)
 	scope.providerStatus.Conditions = setNutanixProviderConditions([]metav1.Condition{cond1, cond2}, scope.providerStatus.Conditions)
 
@@ -142,7 +142,7 @@ func (a *Actuator) Update(ctx context.Context, machine *machinev1beta1.Machine) 
 
 	if err := newReconciler(scope).update(); err != nil {
 		// Update providerStatus conditions
-		cond1 := conditionFailed(MachineUpdate, err.Error())
+		cond1 := conditionFailed(machineUpdate, err.Error())
 		cond2 := conditionInstanceReady(metav1.ConditionUnknown)
 		scope.providerStatus.Conditions = setNutanixProviderConditions([]metav1.Condition{cond1, cond2}, scope.providerStatus.Conditions)
 
@@ -155,7 +155,7 @@ func (a *Actuator) Update(ctx context.Context, machine *machinev1beta1.Machine) 
 	}
 
 	// Update providerStatus conditions
-	cond1 := conditionSuccess(MachineUpdate)
+	cond1 := conditionSuccess(machineUpdate)
 	cond2 := conditionInstanceReady(metav1.ConditionTrue)
 	scope.providerStatus.Conditions = setNutanixProviderConditions([]metav1.Condition{cond1, cond2}, scope.providerStatus.Conditions)
 
@@ -191,7 +191,7 @@ func (a *Actuator) Delete(ctx context.Context, machine *machinev1beta1.Machine) 
 
 	if err := newReconciler(scope).delete(); err != nil {
 		// Update providerStatus conditions
-		cond1 := conditionFailed(MachineDeletion, err.Error())
+		cond1 := conditionFailed(machineDeletion, err.Error())
 		cond2 := conditionInstanceReady(metav1.ConditionUnknown)
 		scope.providerStatus.Conditions = setNutanixProviderConditions([]metav1.Condition{cond1, cond2}, scope.providerStatus.Conditions)
 
@@ -204,7 +204,7 @@ func (a *Actuator) Delete(ctx context.Context, machine *machinev1beta1.Machine) 
 	}
 
 	// Update providerStatus conditions
-	cond1 := conditionSuccess(MachineDeletion)
+	cond1 := conditionSuccess(machineDeletion)
 	cond2 := conditionInstanceReady(metav1.ConditionFalse)
 	scope.providerStatus.Conditions = setNutanixProviderConditions([]metav1.Condition{cond1, cond2}, scope.providerStatus.Conditions)
 
