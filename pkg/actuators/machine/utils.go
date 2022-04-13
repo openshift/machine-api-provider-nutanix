@@ -109,7 +109,7 @@ func addCategory(mscp *machineScope, vmMetadata *nutanixClientV3.Metadata) error
 	categoryKey := fmt.Sprintf("%s%s", NutanixCategoryKeyPrefix, clusterID)
 	_, err = mscp.nutanixClient.V3.GetCategoryValue(categoryKey, NutanixCategoryValue)
 	if err != nil {
-		klog.Errorf("%s: failed to find the category with key %q and value %q. %w", mscp.machine.Name, categoryKey, NutanixCategoryValue, err)
+		klog.Errorf("%s: failed to find the category with key %q and value %q. error: %v", mscp.machine.Name, categoryKey, NutanixCategoryValue, err)
 		return err
 	}
 
@@ -196,42 +196,42 @@ func setClientCredentials(credsData []byte, clientOptions *clientpkg.ClientOptio
 
 // Condition types for an Nutanix VM instance.
 const (
-	// MachineCreation indicates whether the machine's VM has been created or not. If not,
+	// machineCreation indicates whether the machine's VM has been created or not. If not,
 	// it should include a reason and message for the failure.
-	MachineCreation string = "MachineCreation"
+	machineCreation string = "MachineCreation"
 
-	// MachineUpdate indicates whether the machine's VM has been updated or not. If not,
+	// machineUpdate indicates whether the machine's VM has been updated or not. If not,
 	// it should include a reason and message for the failure.
-	MachineUpdate string = "MachineUpdate"
+	machineUpdate string = "MachineUpdate"
 
-	// MachineDeletion indicates whether the machine's VM has been deleted or not. If not,
+	// machineDeletion indicates whether the machine's VM has been deleted or not. If not,
 	// it should include a reason and message for the failure.
-	MachineDeletion string = "MachineDeletion"
+	machineDeletion string = "MachineDeletion"
 
-	// MachineInstanceReady indicates whether the machine's VM gets ready.
-	MachineInstanceReady string = "MachineInstanceReady"
+	// machineInstanceReady indicates whether the machine's VM gets ready.
+	machineInstanceReady string = "MachineInstanceReady"
 )
 
 // Condition reasons for the condition's last transition.
 const (
-	// MachineCreationSucceeded indicates machine creation success.
-	MachineCreationSucceeded string = "MachineCreationSucceeded"
-	// MachineCreationFailed indicates machine creation failure.
-	MachineCreationFailed string = "MachineCreationFailed"
-	// MachineUpdateSucceeded indicates machine update success.
-	MachineUpdateSucceeded string = "MachineUpdateSucceeded"
-	// MachineUpdateFailed indicates machine update failure.
-	MachineUpdateFailed string = "MachineUpdateFailed"
-	// MachineDeletionSucceeded indicates machine deletion success.
-	MachineDeletionSucceeded string = "MachineDeletionSucceeded"
-	// MachineDeletionFailed indicates machine deletion failure.
-	MachineDeletionFailed string = "MachineDeletionFailed"
-	// MachineInstanceIsReady indicates the machine's VM gets ready
-	MachineInstanceIsReady string = "Machine instance is ready"
-	// MachineInstanceNotReady indicates the machine's VM is not ready
-	MachineInstanceNotReady string = "Machine instance is not ready"
-	// MachineInstanceReadyUnknown indicates unknown if the machine's VM is ready
-	MachineInstanceReadyUnknown string = "Unknown machine instance ready or not"
+	// machineCreationSucceeded indicates machine creation success.
+	machineCreationSucceeded string = "MachineCreationSucceeded"
+	// machineCreationFailed indicates machine creation failure.
+	machineCreationFailed string = "MachineCreationFailed"
+	// machineUpdateSucceeded indicates machine update success.
+	machineUpdateSucceeded string = "MachineUpdateSucceeded"
+	// machineUpdateFailed indicates machine update failure.
+	machineUpdateFailed string = "MachineUpdateFailed"
+	// machineDeletionSucceeded indicates machine deletion success.
+	machineDeletionSucceeded string = "MachineDeletionSucceeded"
+	// machineDeletionFailed indicates machine deletion failure.
+	machineDeletionFailed string = "MachineDeletionFailed"
+	// machineInstanceIsReady indicates the machine's VM gets ready
+	machineInstanceIsReady string = "Machine instance is ready"
+	// machineInstanceNotReady indicates the machine's VM is not ready
+	machineInstanceNotReady string = "Machine instance is not ready"
+	// machineInstanceReadyUnknown indicates unknown if the machine's VM is ready
+	machineInstanceReadyUnknown string = "Unknown machine instance ready or not"
 )
 
 // setNutanixProviderConditions sets the conditions for the machine provider and
@@ -286,12 +286,12 @@ func shouldUpdateCondition(newCondition, existingCondition *metav1.Condition) bo
 func conditionSuccess(condType string) metav1.Condition {
 	var reason string
 	switch condType {
-	case MachineCreation:
-		reason = MachineCreationSucceeded
-	case MachineUpdate:
-		reason = MachineUpdateSucceeded
-	case MachineDeletion:
-		reason = MachineDeletionSucceeded
+	case machineCreation:
+		reason = machineCreationSucceeded
+	case machineUpdate:
+		reason = machineUpdateSucceeded
+	case machineDeletion:
+		reason = machineDeletionSucceeded
 	default:
 		reason = condType + " succeeded"
 	}
@@ -307,12 +307,12 @@ func conditionSuccess(condType string) metav1.Condition {
 func conditionFailed(condType string, errMsg string) metav1.Condition {
 	var reason string
 	switch condType {
-	case MachineCreation:
-		reason = MachineCreationFailed
-	case MachineUpdate:
-		reason = MachineUpdateFailed
-	case MachineDeletion:
-		reason = MachineDeletionFailed
+	case machineCreation:
+		reason = machineCreationFailed
+	case machineUpdate:
+		reason = machineUpdateFailed
+	case machineDeletion:
+		reason = machineDeletionFailed
 	default:
 		reason = condType + " failed"
 	}
@@ -329,18 +329,18 @@ func conditionInstanceReady(status metav1.ConditionStatus) metav1.Condition {
 	var reason, msg string
 	switch status {
 	case metav1.ConditionTrue:
-		reason = MachineInstanceIsReady
-		msg = MachineInstanceIsReady
+		reason = machineInstanceIsReady
+		msg = machineInstanceIsReady
 	case metav1.ConditionFalse:
-		reason = MachineInstanceNotReady
-		msg = MachineInstanceNotReady
+		reason = machineInstanceNotReady
+		msg = machineInstanceNotReady
 	case metav1.ConditionUnknown:
-		reason = MachineInstanceReadyUnknown
-		msg = MachineInstanceReadyUnknown
+		reason = machineInstanceReadyUnknown
+		msg = machineInstanceReadyUnknown
 	}
 
 	return metav1.Condition{
-		Type:    MachineInstanceReady,
+		Type:    machineInstanceReady,
 		Status:  status,
 		Reason:  reason,
 		Message: msg,

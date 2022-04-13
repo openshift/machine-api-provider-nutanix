@@ -23,10 +23,10 @@ const (
 	cloudCABundleKey = "ca-bundle.pem"
 
 	// Nutanix credential keys
-	NutanixEndpointKey = "Nutanix_PrismCentral_Endpoint"
-	NutanixPortKey     = "Nutanix_PrismCentral_Port"
-	NutanixUserKey     = "Nutanix_PrismCentral_User"
-	NutanixPasswordKey = "Nutanix_PrismCentral_Password"
+	NutanixEndpointKey = "NUTANIX_PRISM_CENTRAL_ENDPOINT"
+	NutanixPortKey     = "NUTANIX_PRISM_CENTRAL_PORT"
+	NutanixUserKey     = "NUTANIX_PRISM_CENTRAL_USER"
+	NutanixPasswordKey = "NUTANIX_PRISM_CENTRAL_PASSWORD"
 )
 
 type ClientOptions struct {
@@ -58,7 +58,7 @@ func Client(options *ClientOptions) (*nutanixClientV3.Client, error) {
 	klog.Infof("To create nutanixClient with creds: (url: %s, insecure: %v)", options.Credentials.URL, options.Credentials.Insecure)
 	cli, err := nutanixClientV3.NewV3Client(*options.Credentials, options.Debug)
 	if err != nil {
-		klog.Errorf("Failed to create the nutanix client. error: %w", err)
+		klog.Errorf("Failed to create the nutanix client. error: %v", err)
 		return nil, err
 	}
 
