@@ -104,7 +104,7 @@ func (s *machineScope) getNutanixClientOptions() (*clientpkg.ClientOptions, erro
 	err := s.client.Get(s.Context, infraKey, infra)
 	if err != nil {
 		err1 := fmt.Errorf("Could not find the Infrastruture object %q: %w", infraKey.Name, err)
-		klog.Errorf("Machine %q: %w", s.machine.Name, err1)
+		klog.Errorf("Machine %q: %v", s.machine.Name, err1)
 		return nil, err1
 	}
 
@@ -132,7 +132,7 @@ func (s *machineScope) getNutanixClientOptions() (*clientpkg.ClientOptions, erro
 	err = s.client.Get(s.Context, credsSecretKey, credsSecret)
 	if err != nil {
 		err1 := fmt.Errorf("Could not find the local credentials secret %s: %w", credsSecretKey.Name, err)
-		klog.Errorf("Machine %q: %w", s.machine.Name, err1)
+		klog.Errorf("Machine %q: %v", s.machine.Name, err1)
 		return nil, err1
 	}
 
@@ -265,7 +265,7 @@ func (s *machineScope) getNode() (*corev1.Node, error) {
 			klog.Infof("%s: Node %q not found", s.machine.Name, nodeName)
 			return nil, err
 		}
-		klog.Errorf("%s: failed to get node %q. %w", s.machine.Name, nodeName, err)
+		klog.Errorf("%s: failed to get node %q. error: %v", s.machine.Name, nodeName, err)
 		return nil, err
 	}
 
