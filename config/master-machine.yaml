@@ -12,7 +12,7 @@ spec:
       node-role.kubernetes.io/master: ""
   providerSpec:
     value:
-      apiVersion: nutanixproviderconfig.openshift.io/v1beta1
+      apiVersion: machine.openshift.io/v1
       kind: NutanixMachineProviderConfig
       userDataSecret:
         name: master-userdata-secret

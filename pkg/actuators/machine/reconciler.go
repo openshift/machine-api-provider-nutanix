@@ -3,17 +3,15 @@ package machine
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix/v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	configv1 "github.com/openshift/api/config/v1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/openshift/machine-api-operator/pkg/metrics"
-	nutanixv1 "github.com/openshift/machine-api-provider-nutanix/pkg/apis/nutanixprovider/v1beta1"
 )
 
 const (
@@ -21,8 +19,10 @@ const (
 	requeueAfterFatalSeconds = 180
 	masterLabel              = "node-role.kubernetes.io/master"
 
-	providerIDFmt = "nutanix://%s"
-	infraName     = "cluster"
+	providerIDFormat = "nutanix://%s"
+
+	// MachineInstancePowerStateAnnotationName as annotation name for a machine instance power state
+	MachineInstancePowerStateAnnotationName = "machine.openshift.io/instance-power-state"
 )
 
 // Reconciler runs the logic to reconciles a machine resource towards its desired state
@@ -51,28 +51,19 @@ func (r *Reconciler) create() error {
 		return fmt.Errorf("failed to get user data: %w", err)
 	}
 
-	infra := &configv1.Infrastructure{}
-	infraName := client.ObjectKey{Name: infraName}
-
-	if err := r.client.Get(r.Context, infraName, infra); err != nil {
-		klog.Errorf("error reconciling create machine %s: failed to get Infrastructure %s. %v",
-			r.machine.Name, infraName, err)
-		return err
-	}
-
 	vm, err := createVM(r.machineScope, userData)
 	if err != nil {
-		klog.Errorf("%s: error creating machine: %v", r.machine.Name, err)
-		r.machineScope.setProviderStatus(nil, conditionFailed(nutanixv1.MachineCreation, err.Error()))
+		klog.Errorf("%s: error creating machine vm. error: %v", r.machine.Name, err)
+		r.machineScope.setProviderStatus(nil, conditionFailed(machineCreation, err.Error()))
 		return fmt.Errorf("failed to create VM: %w", err)
 	}
 
-	klog.Infof("Created VM %s, with uuid: %s", r.machine.Name, *vm.Metadata.UUID)
+	klog.Infof("Created VM %q, with vm uuid: %s", r.machine.Name, *vm.Metadata.UUID)
 	if err = r.updateMachineWithVMState(vm); err != nil {
 		return fmt.Errorf("failed to update machine with vm state: %w", err)
 	}
 
-	r.machineScope.setProviderStatus(vm, conditionSuccess(nutanixv1.MachineCreation))
+	r.machineScope.setProviderStatus(vm, conditionSuccess(machineCreation))
 
 	return nil
 }
@@ -83,7 +74,7 @@ func (r *Reconciler) update() error {
 
 	err := validateMachine(*r.machine)
 	if err != nil {
-		return fmt.Errorf("%v: failed validating machine provider spec: %v", r.machine.GetName(), err)
+		return fmt.Errorf("%v: failed validating machine provider spec: %w", r.machine.GetName(), err)
 	}
 
 	var vm *nutanixClientV3.VMIntentResponse
@@ -96,9 +87,9 @@ func (r *Reconciler) update() error {
 				Namespace: r.machine.Namespace,
 				Reason:    err.Error(),
 			})
-			klog.Errorf("%s: error finding the vm with name %s: %v", r.machine.Name, r.machine.Name, err)
+			klog.Errorf("%s: error finding the vm with name %q. error: %v", r.machine.Name, r.machine.Name, err)
 
-			r.machineScope.setProviderStatus(nil, conditionFailed(nutanixv1.MachineUpdate, err.Error()))
+			r.machineScope.setProviderStatus(nil, conditionFailed(machineUpdate, err.Error()))
 			return err
 		}
 		r.providerStatus.VmUUID = vm.Metadata.UUID
@@ -113,9 +104,9 @@ func (r *Reconciler) update() error {
 				Namespace: r.machine.Namespace,
 				Reason:    err.Error(),
 			})
-			klog.Errorf("%s: error finding the vm with uuid %s: %v", r.machine.Name, vmUuid, err)
+			klog.Errorf("%s: error finding the vm with uuid %s. error: %v", r.machine.Name, vmUuid, err)
 
-			r.machineScope.setProviderStatus(nil, conditionFailed(nutanixv1.MachineUpdate, err.Error()))
+			r.machineScope.setProviderStatus(nil, conditionFailed(machineUpdate, err.Error()))
 			return err
 		}
 	}
@@ -126,38 +117,37 @@ func (r *Reconciler) update() error {
 			Namespace: r.machine.Namespace,
 			Reason:    err.Error(),
 		})
-		klog.Errorf("%s: error update machine with VM state: %v", r.machine.Name, err)
+		klog.Errorf("%s: error update machine with VM state. error: %v", r.machine.Name, err)
 
-		r.machineScope.setProviderStatus(vm, conditionFailed(nutanixv1.MachineUpdate, err.Error()))
+		r.machineScope.setProviderStatus(vm, conditionFailed(machineUpdate, err.Error()))
 		return err
 	}
 
-	r.machineScope.setProviderStatus(vm, conditionSuccess(nutanixv1.MachineUpdate))
+	r.machineScope.setProviderStatus(vm, conditionSuccess(machineUpdate))
 
-	klog.Infof("Updated machine %s vm state", r.machine.Name)
+	klog.Infof("%s: updated machine vm state", r.machine.Name)
 	return nil
 }
 
 // delete deletes VM
 func (r *Reconciler) delete() error {
-	klog.Infof("%s: deleting machine", r.machine.Name)
-
 	var err error
+	klog.Infof("%s: deleting machine's vm", r.machine.Name)
+
 	if r.providerStatus.VmUUID == nil {
-		err = fmt.Errorf("%s: cannot delete the vm, the vmUUID is null.", r.machine.Name)
-		klog.Errorf(err.Error())
-		return err
+		klog.Warningf("%s: cannot delete a vm not yet created, the vmUUID is null.", r.machine.Name)
+		return nil
 	}
 
 	vmUuid := *r.providerStatus.VmUUID
 	_, err = findVMByUUID(r.nutanixClient, vmUuid)
 	if err != nil {
-		if strings.Contains(err.Error(), "Not Found") {
-			klog.Warningf("%v: vm with uuid %s does not exist", r.machine.Name, vmUuid)
+		if strings.Contains(err.Error(), "NOT_FOUND") {
+			klog.Warningf("%s: vm with uuid %s does not exist", r.machine.Name, vmUuid)
 			return nil
 		}
 
-		klog.Errorf("%v: error finding vm with uuid %s", r.machine.Name, vmUuid)
+		klog.Errorf("%s: error finding vm with uuid %s", r.machine.Name, vmUuid)
 		return err
 	}
 
@@ -165,10 +155,10 @@ func (r *Reconciler) delete() error {
 	if r.isNodeLinked() {
 		attached, err := r.nodeHasVolumesAttached()
 		if err != nil {
-			return fmt.Errorf("failed to determine if node %v has attached volumes: %w", r.machine.Status.NodeRef.Name, err)
+			return fmt.Errorf("failed to determine if node %s has attached volumes: %w", r.machine.Status.NodeRef.Name, err)
 		}
 		if attached {
-			return fmt.Errorf("node %v has attached volumes, requeuing", r.machine.Status.NodeRef.Name)
+			return &machinecontroller.RequeueAfterError{RequeueAfter: 20 * time.Second}
 		}
 	}
 
@@ -180,17 +170,15 @@ func (r *Reconciler) delete() error {
 			Namespace: r.machine.Namespace,
 			Reason:    err.Error(),
 		})
-		klog.Errorf("%s: error deleting vm with uuid %s: %v", r.machine.Name, vmUuid, err)
+		klog.Errorf("%s: error deleting vm with uuid %s. error: %v", r.machine.Name, vmUuid, err)
 		return err
 	}
 
 	// update machine spec and status
 	r.machine.Spec.ProviderID = nil
 	r.machine.Status.Addresses = r.machine.Status.Addresses[:0]
-	r.providerStatus.Ready = false
-	r.providerStatus.VmUUID = nil
 
-	klog.Infof("Deleted machine %v vm with uuid %s", r.machine.Name, vmUuid)
+	klog.Infof("%s: deleted machine's vm with uuid %s", r.machine.Name, vmUuid)
 	return nil
 }
 
@@ -198,7 +186,7 @@ func (r *Reconciler) delete() error {
 func (r *Reconciler) exists() (bool, error) {
 	err := validateMachine(*r.machine)
 	if err != nil {
-		return false, fmt.Errorf("%v: failed validating machine provider spec: %v", r.machine.GetName(), err)
+		return false, fmt.Errorf("%s: failed validating machine provider spec. %w", r.machine.GetName(), err)
 	}
 
 	if r.providerStatus.VmUUID != nil {
@@ -211,7 +199,7 @@ func (r *Reconciler) exists() (bool, error) {
 	}
 
 	if err != nil {
-		if strings.Contains(err.Error(), "Not Found") {
+		if strings.Contains(err.Error(), "NOT_FOUND") {
 			return false, nil
 		}
 
@@ -220,7 +208,7 @@ func (r *Reconciler) exists() (bool, error) {
 			Namespace: r.machine.Namespace,
 			Reason:    err.Error(),
 		})
-		klog.Errorf("%s: error finding the vm : %v", r.machine.Name, err)
+		klog.Errorf("%s: error finding the vm: %w", r.machine.Name, err)
 		return false, err
 	}
 
@@ -231,7 +219,7 @@ func (r *Reconciler) exists() (bool, error) {
 // isMaster returns true if the machine is part of a cluster's control plane
 func (r *Reconciler) isMaster() (bool, error) {
 	if r.machine.Status.NodeRef == nil {
-		klog.Errorf("NodeRef not found in machine %s", r.machine.Name)
+		klog.Errorf("NodeRef not found in machine %q", r.machine.Name)
 		return false, nil
 	}
 	node := &corev1.Node{}
@@ -253,12 +241,12 @@ func (r *Reconciler) isMaster() (bool, error) {
 // setProviderID adds providerID in the machine spec
 func (r *Reconciler) setProviderID(vmUUID *string) error {
 	if vmUUID == nil {
-		return fmt.Errorf("Failed to update machine providerID: null vmUUID")
+		return fmt.Errorf("%s: Failed to update machine providerID: null vmUUID", r.machine.Name)
 	}
 
 	// update the machine.Spec.ProviderID
 	existingProviderID := r.machine.Spec.ProviderID
-	providerID := fmt.Sprintf(providerIDFmt, *vmUUID)
+	providerID := fmt.Sprintf(providerIDFormat, *vmUUID)
 	if existingProviderID != nil && *existingProviderID == providerID {
 		klog.Infof("%s: ProviderID already set in the machine Spec with value: %s", r.machine.Name, *existingProviderID)
 	} else {
@@ -278,20 +266,20 @@ func (r *Reconciler) setProviderID(vmUUID *string) error {
 	node := &corev1.Node{}
 	err := r.client.Get(r.Context, nodeKey, node)
 	if err != nil {
-		return fmt.Errorf("%s: failed to get node %s: %v", r.machine.Name, nodeName, err)
+		return fmt.Errorf("%s: failed to get node %s: %w", r.machine.Name, nodeName, err)
 	}
 
 	existingNodeProviderID := node.Spec.ProviderID
 	if existingNodeProviderID == providerID {
-		klog.Infof("%s: The node %s spec.providerID is already set with value: %s", r.machine.Name, nodeName, existingNodeProviderID)
+		klog.Infof("%s: The node %q spec.providerID is already set with value: %s", r.machine.Name, nodeName, existingNodeProviderID)
 	} else {
 		node.Spec.ProviderID = providerID
 		err := r.client.Update(r.Context, node)
 		if err != nil {
-			klog.Errorf("%s: failed to update the node %s spec.providerID. %v", r.machine.Name, nodeName, err)
+			klog.Errorf("%s: failed to update the node %q spec.providerID. error: %v", r.machine.Name, nodeName, err)
 			return err
 		}
-		klog.Infof("%s: The node %s spec.providerID is set to: %s", r.machine.Name, nodeName, providerID)
+		klog.Infof("%s: The node %q spec.providerID is set to: %s", r.machine.Name, nodeName, providerID)
 	}
 
 	return nil
@@ -302,18 +290,24 @@ func (r *Reconciler) updateMachineWithVMState(vm *nutanixClientV3.VMIntentRespon
 		return nil
 	}
 
-	klog.Infof("%v: updating machine providerID", r.machine.Name)
+	klog.Infof("%s: updating machine providerID", r.machine.Name)
 	if err := r.setProviderID(vm.Metadata.UUID); err != nil {
 		return err
 	}
 
-	powerState := *vm.Status.Resources.PowerState
+	vmType := stringPointerDeref(vm.Status.Resources.HypervisorType)
+	vmState := stringPointerDeref(vm.Status.State)
+	powerState := stringPointerDeref(vm.Status.Resources.PowerState)
 	if r.machine.Annotations == nil {
 		r.machine.Annotations = map[string]string{}
 	}
-	r.machine.Annotations[machinecontroller.MachineInstanceStateAnnotationName] = powerState
-	klog.Infof("%v: updated machine powerstate annotation (%s: %s)", r.machine.Name,
-		machinecontroller.MachineInstanceStateAnnotationName, powerState)
+	r.machine.Annotations[machinecontroller.MachineInstanceTypeLabelName] = vmType
+	r.machine.Annotations[machinecontroller.MachineInstanceStateAnnotationName] = vmState
+	r.machine.Annotations[MachineInstancePowerStateAnnotationName] = powerState
+	klog.Infof("%s: updated machine instance state annotations (%s: %s), (%s: %s), (%s: %s)", r.machine.Name,
+		machinecontroller.MachineInstanceTypeLabelName, vmType,
+		machinecontroller.MachineInstanceStateAnnotationName, vmState,
+		MachineInstancePowerStateAnnotationName, powerState)
 
 	return nil
 }

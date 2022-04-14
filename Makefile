@@ -92,7 +92,7 @@ images: ## Create images
 ifeq ($(NO_DOCKER), 1)
 	./hack/imagebuilder.sh
 endif
-	$(IMAGE_BUILD_CMD) -t "$(IMAGE):$(VERSION)" -t "$(IMAGE):$(MUTABLE_TAG)" -f Dockerfile ./
+	$(IMAGE_BUILD_CMD) -t "$(IMAGE):$(VERSION)" -t "$(IMAGE):$(MUTABLE_TAG)" ./
 
 .PHONY: push
 push:

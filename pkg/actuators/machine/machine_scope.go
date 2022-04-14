@@ -3,23 +3,25 @@ package machine
 import (
 	"context"
 	"fmt"
-	"os"
+	"strconv"
 
+	configv1 "github.com/openshift/api/config/v1"
+	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	machineapierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
+	clientpkg "github.com/openshift/machine-api-provider-nutanix/pkg/client"
+
+	nutanixClient "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix"
 	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix/v3"
 	corev1 "k8s.io/api/core/v1"
 	apimachineryerrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
-
-	machinev1 "github.com/openshift/api/machine/v1beta1"
-	machineapierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
-	nutanixv1 "github.com/openshift/machine-api-provider-nutanix/pkg/apis/nutanixprovider/v1beta1"
-	clientpkg "github.com/openshift/machine-api-provider-nutanix/pkg/client"
 )
 
 const (
-	defaultNutanixCredsSecretName = "nutanix-creds-secret"
-	userDataSecretKey             = "userData"
+	userDataSecretKey = "userData"
 )
 
 // machineScopeParams defines the input parameters used to create a new MachineScope.
@@ -30,7 +32,7 @@ type machineScopeParams struct {
 	// api server controller runtime client
 	client runtimeclient.Client
 	// machine resource
-	machine *machinev1.Machine
+	machine *machinev1beta1.Machine
 	// api server controller runtime client for the openshift-config-managed namespace
 	configManagedClient runtimeclient.Client
 }
@@ -43,10 +45,10 @@ type machineScope struct {
 	// api server controller runtime client
 	client runtimeclient.Client
 	// machine resource
-	machine            *machinev1.Machine
+	machine            *machinev1beta1.Machine
 	machineToBePatched runtimeclient.Patch
-	providerSpec       *nutanixv1.NutanixMachineProviderConfig
-	providerStatus     *nutanixv1.NutanixMachineProviderStatus
+	providerSpec       *machinev1.NutanixMachineProviderConfig
+	providerStatus     *machinev1.NutanixMachineProviderStatus
 }
 
 func newMachineScope(params machineScopeParams) (*machineScope, error) {
@@ -54,12 +56,12 @@ func newMachineScope(params machineScopeParams) (*machineScope, error) {
 		return nil, fmt.Errorf("context and machine should not be nil")
 	}
 
-	providerSpec, err := nutanixv1.ProviderSpecFromRawExtension(params.machine.Spec.ProviderSpec.Value)
+	providerSpec, err := NutanixMachineProviderSpecFromRawExtension(params.machine.Spec.ProviderSpec.Value)
 	if err != nil {
-		return nil, machineapierrors.InvalidMachineConfiguration("failed to get machine config: %v", err)
+		return nil, machineapierrors.InvalidMachineConfiguration("failed to get machine provider config: %v", err)
 	}
 
-	providerStatus, err := nutanixv1.ProviderStatusFromRawExtension(params.machine.Status.ProviderStatus)
+	providerStatus, err := NutanixMachineProviderStatusFromRawExtension(params.machine.Status.ProviderStatus)
 	if err != nil {
 		return nil, machineapierrors.InvalidMachineConfiguration("failed to get machine provider status: %v", err.Error())
 	}
@@ -73,51 +75,84 @@ func newMachineScope(params machineScopeParams) (*machineScope, error) {
 		providerStatus:     providerStatus,
 	}
 
-	mscp.getNutanixCredentials()
-	nutanixClient, err := clientpkg.Client(clientpkg.ClientOptions{Debug: true})
+	clientOptions, err := mscp.getNutanixClientOptions()
 	if err != nil {
-		return nil, machineapierrors.InvalidMachineConfiguration("failed to create nutanix client: %v", err.Error())
+		return nil, fmt.Errorf("failed to get endpoint and/or credentials to access the Nutanix PC: %w", err)
+	}
+
+	nutanixClient, err := clientpkg.Client(clientOptions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create nutanix client: %w", err)
 	}
 
 	mscp.nutanixClient = nutanixClient
 	return mscp, nil
 }
 
-func (s *machineScope) getNutanixCredentials() {
-	credsSecretName := defaultNutanixCredsSecretName
-	if s.providerSpec.CredentialsSecret != nil {
-		credsSecretName = s.providerSpec.CredentialsSecret.Name
+func (s *machineScope) getNutanixClientOptions() (*clientpkg.ClientOptions, error) {
+
+	clientOptions := &clientpkg.ClientOptions{
+		Credentials: &nutanixClient.Credentials{},
+		Debug:       true,
 	}
+
+	// Get the PC endpoint/port from the Infrastructure CR
+	infra := &configv1.Infrastructure{}
+	infraKey := runtimeclient.ObjectKey{
+		Name: globalInfrastuctureName,
+	}
+	err := s.client.Get(s.Context, infraKey, infra)
+	if err != nil {
+		err1 := fmt.Errorf("Could not find the Infrastruture object %q: %w", infraKey.Name, err)
+		klog.Errorf("Machine %q: %v", s.machine.Name, err1)
+		return nil, err1
+	}
+
+	pcEndpoint := infra.Spec.PlatformSpec.Nutanix.PrismCentral.Address
+	pcPort := infra.Spec.PlatformSpec.Nutanix.PrismCentral.Port
+	if len(pcEndpoint) == 0 {
+		return nil, fmt.Errorf("The prismCentralEndpoint field is not set in the Infrastreucture CR")
+	}
+	clientOptions.Credentials.Endpoint = pcEndpoint
+
+	if pcPort < 1 || pcPort > 65535 {
+		return nil, fmt.Errorf("The pcPort field is not set right in the Infrastreucture CR: %d", pcPort)
+	}
+	clientOptions.Credentials.Port = strconv.Itoa(int(pcPort))
+
+	if s.providerSpec.CredentialsSecret == nil || len(s.providerSpec.CredentialsSecret.Name) == 0 {
+		return nil, fmt.Errorf("The nutanix providerSpec credentialsSecret reference is not set.")
+	}
+	credsSecretName := s.providerSpec.CredentialsSecret.Name
 	credsSecret := &corev1.Secret{}
 	credsSecretKey := runtimeclient.ObjectKey{
 		Namespace: s.machine.Namespace,
 		Name:      credsSecretName,
 	}
-	err := s.client.Get(s.Context, credsSecretKey, credsSecret)
+	err = s.client.Get(s.Context, credsSecretKey, credsSecret)
 	if err != nil {
-		klog.Warningf("[Machine: %s] Could not find the credentials secret %s", s.machine.Name, credsSecretKey.Name)
-		return
+		err1 := fmt.Errorf("Could not find the local credentials secret %s: %w", credsSecretKey.Name, err)
+		klog.Errorf("Machine %q: %v", s.machine.Name, err1)
+		return nil, err1
 	}
 
-	if endpoint, ok := credsSecret.Data[clientpkg.NutanixEndpointKey]; ok {
-		os.Setenv(clientpkg.NutanixEndpointKey, string(endpoint))
+	credentialsData, ok := credsSecret.Data["credentials"]
+	if !ok {
+		return nil, fmt.Errorf("No credentials data found in the local secret %q", credsSecret.Name)
 	}
-	if port, ok := credsSecret.Data[clientpkg.NutanixPortKey]; ok {
-		os.Setenv(clientpkg.NutanixPortKey, string(port))
+
+	if err = setClientCredentials(credentialsData, clientOptions); err != nil {
+		return nil, fmt.Errorf("Failed to get the credentials data to create the PC client. %w", err)
 	}
-	if username, ok := credsSecret.Data[clientpkg.NutanixUserKey]; ok {
-		os.Setenv(clientpkg.NutanixUserKey, string(username))
-	}
-	if password, ok := credsSecret.Data[clientpkg.NutanixPasswordKey]; ok {
-		os.Setenv(clientpkg.NutanixPasswordKey, string(password))
-	}
+
+	return clientOptions, nil
 }
 
 // Patch patches the machine spec and machine status after reconciling.
 func (s *machineScope) patchMachine() error {
 	klog.V(3).Infof("%s: patching machine", s.machine.GetName())
 
-	providerStatus, err := nutanixv1.RawExtensionFromProviderStatus(s.providerStatus)
+	providerStatus, err := RawExtensionFromNutanixMachineProviderStatus(s.providerStatus)
 	if err != nil {
 		return machineapierrors.InvalidMachineConfiguration("failed to get machine provider status: %v", err.Error())
 	}
@@ -127,7 +162,7 @@ func (s *machineScope) patchMachine() error {
 
 	// patch machine
 	if err := s.client.Patch(s.Context, s.machine, s.machineToBePatched); err != nil {
-		e1 := fmt.Errorf("Failed to patch machine %q: %v", s.machine.GetName(), err)
+		e1 := fmt.Errorf("Failed to patch machine %q: %w", s.machine.GetName(), err)
 		klog.Error(e1.Error())
 		return e1
 	}
@@ -136,7 +171,7 @@ func (s *machineScope) patchMachine() error {
 
 	// patch status
 	if err := s.client.Status().Patch(context.Background(), s.machine, s.machineToBePatched); err != nil {
-		e1 := fmt.Errorf("Failed to patch machine status %q: %v", s.machine.GetName(), err)
+		e1 := fmt.Errorf("%s: failed to patch machine status. %w", s.machine.GetName(), err)
 		klog.Error(e1.Error())
 		return e1
 	}
@@ -170,14 +205,12 @@ func (s *machineScope) getUserData() ([]byte, error) {
 	return userData, nil
 }
 
-func (s *machineScope) setProviderStatus(vm *nutanixClientV3.VMIntentResponse,
-	condition nutanixv1.NutanixMachineProviderCondition) error {
+func (s *machineScope) setProviderStatus(vm *nutanixClientV3.VMIntentResponse, condition metav1.Condition) error {
 
 	klog.Infof("%s: Updating providerStatus", s.machine.Name)
 
 	if vm == nil {
-		s.providerStatus.Ready = false
-		s.providerStatus.Conditions = setNutanixProviderCondition(condition, s.providerStatus.Conditions)
+		s.providerStatus.Conditions = setNutanixProviderConditions([]metav1.Condition{condition}, s.providerStatus.Conditions)
 		return nil
 	}
 
@@ -206,8 +239,7 @@ func (s *machineScope) setProviderStatus(vm *nutanixClientV3.VMIntentResponse,
 	}
 	s.machine.Status.Addresses = addresses
 
-	s.providerStatus.Ready = true
-	s.providerStatus.Conditions = setNutanixProviderCondition(condition, s.providerStatus.Conditions)
+	s.providerStatus.Conditions = setNutanixProviderConditions([]metav1.Condition{condition}, s.providerStatus.Conditions)
 
 	return nil
 }
@@ -230,10 +262,10 @@ func (s *machineScope) getNode() (*corev1.Node, error) {
 	err := s.client.Get(s.Context, nodeKey, &node)
 	if err != nil {
 		if apimachineryerrors.IsNotFound(err) {
-			klog.Infof("[Machine: %s] Node %q not found", s.machine.Name, nodeName)
+			klog.Infof("%s: Node %q not found", s.machine.Name, nodeName)
 			return nil, err
 		}
-		klog.Errorf("[Machine: %s] Failed to get node %q: %v", s.machine.Name, nodeName, err)
+		klog.Errorf("%s: failed to get node %q. error: %v", s.machine.Name, nodeName, err)
 		return nil, err
 	}
 

@@ -24,17 +24,18 @@ import (
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 	gtypes "github.com/onsi/gomega/types"
-	machinev1 "github.com/openshift/api/machine/v1beta1"
+	machinev1 "github.com/openshift/api/machine/v1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-
-	nutanixv1 "github.com/openshift/machine-api-provider-nutanix/pkg/apis/nutanixprovider/v1beta1"
 )
 
 var _ = Describe("MachineSet Reconciler", func() {
@@ -69,9 +70,9 @@ var _ = Describe("MachineSet Reconciler", func() {
 	})
 
 	type reconcileTestCase = struct {
-		numVcpusPerSocket   int64
-		numSockets          int64
-		memorySizeMib       int64
+		numVcpusPerSocket   int32
+		numSockets          int32
+		memorySize          resource.Quantity
 		existingAnnotations map[string]string
 		expectedAnnotations map[string]string
 		expectedEvents      []string
@@ -79,13 +80,13 @@ var _ = Describe("MachineSet Reconciler", func() {
 
 	DescribeTable("when reconciling MachineSets", func(rtc reconcileTestCase) {
 		machineSet, err := newTestMachineSet(namespace.Name, rtc.numVcpusPerSocket,
-			rtc.numSockets, rtc.memorySizeMib, rtc.existingAnnotations)
+			rtc.numSockets, rtc.memorySize, rtc.existingAnnotations)
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(c.Create(ctx, machineSet)).To(Succeed())
 
 		Eventually(func() map[string]string {
-			m := &machinev1.MachineSet{}
+			m := &machinev1beta1.MachineSet{}
 			key := client.ObjectKey{Namespace: machineSet.Namespace, Name: machineSet.Name}
 			err := c.Get(ctx, key, m)
 			if err != nil {
@@ -112,7 +113,7 @@ var _ = Describe("MachineSet Reconciler", func() {
 		Entry("with 2cpu 8memory", reconcileTestCase{
 			numVcpusPerSocket:   2,
 			numSockets:          1,
-			memorySizeMib:       8192,
+			memorySize:          parseQuantity("8192Mi"),
 			existingAnnotations: make(map[string]string),
 			expectedAnnotations: map[string]string{
 				cpuKey:    "2",
@@ -123,7 +124,7 @@ var _ = Describe("MachineSet Reconciler", func() {
 		Entry("with 4cpu 16memory", reconcileTestCase{
 			numVcpusPerSocket:   4,
 			numSockets:          1,
-			memorySizeMib:       16384,
+			memorySize:          parseQuantity("16Gi"),
 			existingAnnotations: make(map[string]string),
 			expectedAnnotations: map[string]string{
 				cpuKey:    "4",
@@ -135,7 +136,7 @@ var _ = Describe("MachineSet Reconciler", func() {
 })
 
 func deleteMachineSets(c client.Client, namespaceName string) error {
-	machineSets := &machinev1.MachineSetList{}
+	machineSets := &machinev1beta1.MachineSetList{}
 	err := c.List(ctx, machineSets, client.InNamespace(namespaceName))
 	if err != nil {
 		return err
@@ -149,7 +150,7 @@ func deleteMachineSets(c client.Client, namespaceName string) error {
 	}
 
 	Eventually(func() error {
-		machineSets := &machinev1.MachineSetList{}
+		machineSets := &machinev1beta1.MachineSetList{}
 		err := c.List(ctx, machineSets)
 		if err != nil {
 			return err
@@ -166,9 +167,9 @@ func deleteMachineSets(c client.Client, namespaceName string) error {
 func TestReconcile(t *testing.T) {
 	testCases := []struct {
 		name                string
-		numVcpusPerSocket   int64
-		numSockets          int64
-		memorySizeMib       int64
+		numVcpusPerSocket   int32
+		numSockets          int32
+		memorySize          resource.Quantity
 		existingAnnotations map[string]string
 		expectedAnnotations map[string]string
 		expectErr           bool
@@ -177,7 +178,7 @@ func TestReconcile(t *testing.T) {
 			name:                "with 2cpu 8memory",
 			numVcpusPerSocket:   2,
 			numSockets:          1,
-			memorySizeMib:       8192,
+			memorySize:          parseQuantity("8192Mi"),
 			existingAnnotations: make(map[string]string),
 			expectedAnnotations: map[string]string{
 				cpuKey:    "2",
@@ -189,7 +190,7 @@ func TestReconcile(t *testing.T) {
 			name:                "with 4cpu 16memory",
 			numVcpusPerSocket:   4,
 			numSockets:          1,
-			memorySizeMib:       16384,
+			memorySize:          parseQuantity("16Gi"),
 			existingAnnotations: make(map[string]string),
 			expectedAnnotations: map[string]string{
 				cpuKey:    "4",
@@ -204,7 +205,7 @@ func TestReconcile(t *testing.T) {
 			g := NewWithT(tt)
 
 			machineSet, err := newTestMachineSet("default", tc.numVcpusPerSocket,
-				tc.numSockets, tc.memorySizeMib, tc.existingAnnotations)
+				tc.numSockets, tc.memorySize, tc.existingAnnotations)
 			g.Expect(err).ToNot(HaveOccurred())
 
 			_, err = reconcile(machineSet)
@@ -214,8 +215,17 @@ func TestReconcile(t *testing.T) {
 	}
 }
 
-func newTestMachineSet(namespace string, numVcpusPerSocket, numSockets, memorySizeMib int64,
-	existingAnnotations map[string]string) (*machinev1.MachineSet, error) {
+func parseQuantity(str string) resource.Quantity {
+	q, err := resource.ParseQuantity(str)
+	if err != nil {
+		klog.Fatal(err)
+	}
+
+	return q
+}
+
+func newTestMachineSet(namespace string, numVcpusPerSocket, numSockets int32, memorySize resource.Quantity,
+	existingAnnotations map[string]string) (*machinev1beta1.MachineSet, error) {
 
 	// Copy anntotations map so we don't modify the input
 	annotations := make(map[string]string)
@@ -223,10 +233,10 @@ func newTestMachineSet(namespace string, numVcpusPerSocket, numSockets, memorySi
 		annotations[k] = v
 	}
 
-	machineProviderSpec := &nutanixv1.NutanixMachineProviderConfig{
-		NumVcpusPerSocket: numVcpusPerSocket,
-		NumSockets:        numSockets,
-		MemorySizeMib:     memorySizeMib,
+	machineProviderSpec := &machinev1.NutanixMachineProviderConfig{
+		VCPUsPerSocket: numVcpusPerSocket,
+		VCPUSockets:    numSockets,
+		MemorySize:     memorySize,
 	}
 	providerSpec, err := providerSpecFromMachine(machineProviderSpec)
 	if err != nil {
@@ -234,16 +244,16 @@ func newTestMachineSet(namespace string, numVcpusPerSocket, numSockets, memorySi
 	}
 
 	replicas := int32(1)
-	return &machinev1.MachineSet{
+	return &machinev1beta1.MachineSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations:  annotations,
 			GenerateName: "test-machineset-",
 			Namespace:    namespace,
 		},
-		Spec: machinev1.MachineSetSpec{
+		Spec: machinev1beta1.MachineSetSpec{
 			Replicas: &replicas,
-			Template: machinev1.MachineTemplateSpec{
-				Spec: machinev1.MachineSpec{
+			Template: machinev1beta1.MachineTemplateSpec{
+				Spec: machinev1beta1.MachineSpec{
 					ProviderSpec: providerSpec,
 				},
 			},
@@ -251,12 +261,12 @@ func newTestMachineSet(namespace string, numVcpusPerSocket, numSockets, memorySi
 	}, nil
 }
 
-func providerSpecFromMachine(in *nutanixv1.NutanixMachineProviderConfig) (machinev1.ProviderSpec, error) {
+func providerSpecFromMachine(in *machinev1.NutanixMachineProviderConfig) (machinev1beta1.ProviderSpec, error) {
 	bytes, err := json.Marshal(in)
 	if err != nil {
-		return machinev1.ProviderSpec{}, err
+		return machinev1beta1.ProviderSpec{}, err
 	}
-	return machinev1.ProviderSpec{
+	return machinev1beta1.ProviderSpec{
 		Value: &runtime.RawExtension{Raw: bytes},
 	}, nil
 }
