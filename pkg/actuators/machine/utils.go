@@ -91,8 +91,8 @@ func NutanixMachineProviderStatusFromRawExtension(rawExtension *runtime.RawExten
 // created for the cluster
 const (
 	// Expected NutanixCategory Key format: "openshift-<cluster-id>"
-	NutanixCategoryKeyPrefix = "openshift-"
-	NutanixCategoryValue     = "openshift-ipi-installations"
+	NutanixCategoryKeyPrefix = "kubernetes-io-cluster-"
+	NutanixCategoryValue     = "owned"
 )
 
 // Add the category for installer clueanup the Machine VM at cluster torn-down time

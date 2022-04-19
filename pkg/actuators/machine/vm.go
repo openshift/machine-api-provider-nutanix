@@ -10,6 +10,7 @@ import (
 
 	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix/v3"
 	"github.com/nutanix-cloud-native/prism-go-client/pkg/utils"
+	machinev1 "github.com/openshift/api/machine/v1"
 	clientpkg "github.com/openshift/machine-api-provider-nutanix/pkg/client"
 )
 
@@ -40,22 +41,35 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 		vmInput := nutanixClientV3.VMIntentInput{}
 		vmSpec := nutanixClientV3.VM{Name: utils.StringPtr(vmName)}
 
-		// subnet
-		var subnetUuidPtr *string
-		if mscp.providerSpec.Subnet.UUID != nil {
-			subnetUuidPtr = mscp.providerSpec.Subnet.UUID
-		} else if mscp.providerSpec.Subnet.Name != nil {
-			subnetUuidPtr, err = findSubenetUuidByName(mscp.nutanixClient, *mscp.providerSpec.Subnet.Name)
-			if err != nil {
-				return nil, err
+		// subnets
+		nicList := []*nutanixClientV3.VMNic{}
+		for _, subnet := range mscp.providerSpec.Subnets {
+			var subnetUuidPtr *string
+			switch subnet.Type {
+			case machinev1.NutanixIdentifierUUID:
+				if subnet.UUID == nil {
+					return nil, fmt.Errorf("The subnet identifier type is 'uuid', but the uuid data is not provided")
+				}
+				subnetUuidPtr = subnet.UUID
+			case machinev1.NutanixIdentifierName:
+				if subnet.Name == nil {
+					return nil, fmt.Errorf("The subnet identifier type is 'name', but the name data is not provided")
+				}
+				subnetUuidPtr, err = findSubenetUuidByName(mscp.nutanixClient, *subnet.Name)
+				if err != nil {
+					return nil, err
+				}
+			default:
+				return nil, fmt.Errorf("The subnet identifier type is not supported: %v", subnet.Type)
 			}
+
+			vmNic := &nutanixClientV3.VMNic{
+				SubnetReference: &nutanixClientV3.Reference{
+					Kind: utils.StringPtr("subnet"),
+					UUID: subnetUuidPtr,
+				}}
+			nicList = append(nicList, vmNic)
 		}
-		vmNic := &nutanixClientV3.VMNic{
-			SubnetReference: &nutanixClientV3.Reference{
-				Kind: utils.StringPtr("subnet"),
-				UUID: subnetUuidPtr,
-			}}
-		nicList := []*nutanixClientV3.VMNic{vmNic}
 
 		// rhcos image system disk
 		var imageUuidPtr *string

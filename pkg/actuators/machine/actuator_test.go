@@ -181,9 +181,12 @@ func TestMachineEvents(t *testing.T) {
 			gs := NewWithT(t)
 
 			providerSpec, err := RawExtensionFromNutanixMachineProviderSpec(&machinev1.NutanixMachineProviderConfig{
-				Cluster:        machinev1.NutanixResourceIdentifier{Type: "name", Name: utils.StringPtr("ganon")},
-				Image:          machinev1.NutanixResourceIdentifier{Type: "name", Name: utils.StringPtr("rhcos-4.10-nutanix")},
-				Subnet:         machinev1.NutanixResourceIdentifier{Type: "name", Name: utils.StringPtr("sherlock_net")},
+				Cluster: machinev1.NutanixResourceIdentifier{Type: "name", Name: utils.StringPtr("ganon")},
+				Image:   machinev1.NutanixResourceIdentifier{Type: "name", Name: utils.StringPtr("rhcos-4.10-nutanix")},
+				Subnets: []machinev1.NutanixResourceIdentifier{
+					{Type: "name", Name: utils.StringPtr("sherlock_net")},
+					{Type: "uuid", UUID: utils.StringPtr("c7938dc6-7659-453e-a688-e26020c68g02")},
+				},
 				VCPUsPerSocket: 2,
 				VCPUSockets:    1,
 				MemorySize:     resource.MustParse("4096Mi"),
@@ -222,6 +225,10 @@ func TestMachineEvents(t *testing.T) {
 			defer func() {
 				gs.Expect(k8sClient.Delete(ctx, machine)).To(Succeed())
 			}()
+			// Verify the created Machine CR's providerSpec fields
+			machineProviderSpec, err := NutanixMachineProviderSpecFromRawExtension(machine.Spec.ProviderSpec.Value)
+			gs.Expect(err).ToNot(HaveOccurred())
+			g.Expect(machineProviderSpec.Subnets).Should(HaveLen(2))
 
 			// Ensure the machine has synced to the cache
 			getMachine := func() error {

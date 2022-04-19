@@ -9,7 +9,7 @@ require (
 	github.com/nutanix-cloud-native/prism-go-client v0.0.0-20211220162817-689f23de3cdc
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.17.0
-	github.com/openshift/api v0.0.0-20220325173635-8107b7a38e53
+	github.com/openshift/api v0.0.0-20220412182430-7c9d6528f1cc
 	github.com/openshift/machine-api-operator v0.2.1-0.20220411140824-843ae6e7a92a
 
 	// kube 1.23
