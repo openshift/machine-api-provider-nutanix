@@ -42,6 +42,12 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 		vmSpec := nutanixClientV3.VM{Name: utils.StringPtr(vmName)}
 
 		// subnets
+		// Currently we only allow and support one subnet per VM
+		// We may extend to allow and support more than one subnets per VM, in the future release
+		if len(mscp.providerSpec.Subnets) > 1 {
+			return nil, fmt.Errorf("Currently we only allow and support one subnet per VM, but more than one subnets are configured.")
+		}
+
 		nicList := []*nutanixClientV3.VMNic{}
 		for _, subnet := range mscp.providerSpec.Subnets {
 			var subnetUuidPtr *string
@@ -55,7 +61,7 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 				if subnet.Name == nil {
 					return nil, fmt.Errorf("The subnet identifier type is 'name', but the name data is not provided")
 				}
-				subnetUuidPtr, err = findSubenetUuidByName(mscp.nutanixClient, *subnet.Name)
+				subnetUuidPtr, err = findSubnetUuidByName(mscp.nutanixClient, *subnet.Name)
 				if err != nil {
 					return nil, err
 				}
@@ -69,6 +75,9 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 					UUID: subnetUuidPtr,
 				}}
 			nicList = append(nicList, vmNic)
+		}
+		if len(nicList) == 0 {
+			return nil, fmt.Errorf("No valid subnet is configured for vm %q", vmName)
 		}
 
 		// rhcos image system disk
@@ -274,8 +283,8 @@ func findImageUuidByName(ntnxclient *nutanixClientV3.Client, imageName string) (
 	return res.Entities[0].Metadata.UUID, nil
 }
 
-// findSubenetUuidByName retrieves the subnet uuid by the given subnet name
-func findSubenetUuidByName(ntnxclient *nutanixClientV3.Client, subnetName string) (*string, error) {
+// findSubnetUuidByName retrieves the subnet uuid by the given subnet name
+func findSubnetUuidByName(ntnxclient *nutanixClientV3.Client, subnetName string) (*string, error) {
 	klog.Infof("Checking if subnet with name %q exists.", subnetName)
 
 	res, err := ntnxclient.V3.ListSubnet(&nutanixClientV3.DSMetadata{

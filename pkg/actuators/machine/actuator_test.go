@@ -22,8 +22,10 @@ import (
 )
 
 const (
-	// NutanixCredentialsSecretName is the name of the secret holding the credentials for PC client
-	NutanixCredentialsSecretName = "nutanix-credentials"
+	// credentialsSecretName is the name of the secret holding the credentials for PC client
+	credentialsSecretName = "nutanix-credentials"
+
+	userDataSecretName = "nutanix-userdata"
 
 	credentialsData = `[{"type":"basic_auth","data":{"prismCentral":{"username":"pc_user","password":"pc_password"},"prismElements":[{"name":"pe_name","username":"pe_user","password":"pe_password"}]}}]`
 )
@@ -97,7 +99,7 @@ func TestMachineEvents(t *testing.T) {
 
 	credsSecret := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      NutanixCredentialsSecretName,
+			Name:      credentialsSecretName,
 			Namespace: testNsName,
 		},
 		Data: map[string][]byte{
@@ -109,7 +111,6 @@ func TestMachineEvents(t *testing.T) {
 		g.Expect(k8sClient.Delete(ctx, &credsSecret)).To(Succeed())
 	}()
 
-	userDataSecretName := "nutanix-userdata"
 	userDataSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      userDataSecretName,
@@ -125,23 +126,26 @@ func TestMachineEvents(t *testing.T) {
 	}()
 
 	cases := []struct {
-		name        string
-		machineName string
-		error       string
-		operation   func(actuator *Actuator, machine *machinev1beta1.Machine)
-		event       string
+		name         string
+		machineName  string
+		providerSpec *machinev1.NutanixMachineProviderConfig
+		error        string
+		operation    func(actuator *Actuator, machine *machinev1beta1.Machine)
+		event        string
 	}{
 		{
-			name:        "Create machine failed on invalid machine scope",
-			machineName: "test-machine",
+			name:         "Create machine failed on invalid machine scope",
+			machineName:  "test-machine",
+			providerSpec: validProviderSpec(),
 			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
 				actuator.Create(nil, machine)
 			},
 			event: "context and machine should not be nil",
 		},
 		{
-			name:        "Create machine failed on missing required label",
-			machineName: "test-machine",
+			name:         "Create machine failed on missing required label",
+			machineName:  "test-machine",
+			providerSpec: validProviderSpec(),
 			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
 				machine.Labels[machinev1beta1.MachineClusterIDLabel] = ""
 				actuator.Create(ctx, machine)
@@ -149,16 +153,58 @@ func TestMachineEvents(t *testing.T) {
 			event: "missing \"machine.openshift.io/cluster-api-cluster\" label",
 		},
 		{
-			name:        "Update machine failed on invalid machine scope",
+			name:        "Create machine failed on missing required subnets",
 			machineName: "test-machine",
+			providerSpec: func() *machinev1.NutanixMachineProviderConfig {
+				pspec := validProviderSpec()
+				pspec.Subnets = []machinev1.NutanixResourceIdentifier{}
+				return pspec
+			}(),
+			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
+				actuator.Create(ctx, machine)
+			},
+			event: "No valid subnet is configured",
+		},
+		{
+			name:        "Create machine failed on configuring more than one subnets",
+			machineName: "test-machine",
+			providerSpec: func() *machinev1.NutanixMachineProviderConfig {
+				pspec := validProviderSpec()
+				pspec.Subnets = append(pspec.Subnets,
+					machinev1.NutanixResourceIdentifier{Type: "uuid", UUID: utils.StringPtr("c7938dc6-7659-453e-a688-e26020c68g02")})
+				return pspec
+			}(),
+			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
+				actuator.Create(ctx, machine)
+			},
+			event: "more than one subnets are configured",
+		},
+		{
+			name:        "Create machine failed on missing/invalid subnet identifier",
+			machineName: "test-machine",
+			providerSpec: func() *machinev1.NutanixMachineProviderConfig {
+				pspec := validProviderSpec()
+				pspec.Subnets[0].Type = ""
+				return pspec
+			}(),
+			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
+				actuator.Create(ctx, machine)
+			},
+			event: "The subnet identifier type is not supported",
+		},
+		{
+			name:         "Update machine failed on invalid machine scope",
+			machineName:  "test-machine",
+			providerSpec: validProviderSpec(),
 			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
 				actuator.Update(nil, machine)
 			},
 			event: "context and machine should not be nil",
 		},
 		{
-			name:        "Update failed on missing required label",
-			machineName: "test-machine",
+			name:         "Update failed on missing required label",
+			machineName:  "test-machine",
+			providerSpec: validProviderSpec(),
 			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
 				machine.Labels[machinev1beta1.MachineClusterIDLabel] = ""
 				actuator.Update(ctx, machine)
@@ -166,8 +212,9 @@ func TestMachineEvents(t *testing.T) {
 			event: "missing \"machine.openshift.io/cluster-api-cluster\" label",
 		},
 		{
-			name:        "Delete machine event failed on invalid machine scope",
-			machineName: "test-machine",
+			name:         "Delete machine event failed on invalid machine scope",
+			machineName:  "test-machine",
+			providerSpec: validProviderSpec(),
 			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
 				actuator.Delete(nil, machine)
 			},
@@ -180,24 +227,7 @@ func TestMachineEvents(t *testing.T) {
 			timeout := 30 * time.Second
 			gs := NewWithT(t)
 
-			providerSpec, err := RawExtensionFromNutanixMachineProviderSpec(&machinev1.NutanixMachineProviderConfig{
-				Cluster: machinev1.NutanixResourceIdentifier{Type: "name", Name: utils.StringPtr("ganon")},
-				Image:   machinev1.NutanixResourceIdentifier{Type: "name", Name: utils.StringPtr("rhcos-4.10-nutanix")},
-				Subnets: []machinev1.NutanixResourceIdentifier{
-					{Type: "name", Name: utils.StringPtr("sherlock_net")},
-					{Type: "uuid", UUID: utils.StringPtr("c7938dc6-7659-453e-a688-e26020c68g02")},
-				},
-				VCPUsPerSocket: 2,
-				VCPUSockets:    1,
-				MemorySize:     resource.MustParse("4096Mi"),
-				SystemDiskSize: resource.MustParse("120Gi"),
-				CredentialsSecret: &corev1.LocalObjectReference{
-					Name: NutanixCredentialsSecretName,
-				},
-				UserDataSecret: &corev1.LocalObjectReference{
-					Name: userDataSecretName,
-				},
-			})
+			providerSpec, err := RawExtensionFromNutanixMachineProviderSpec(tc.providerSpec)
 			gs.Expect(err).ToNot(HaveOccurred())
 
 			machine := &machinev1beta1.Machine{
@@ -225,10 +255,6 @@ func TestMachineEvents(t *testing.T) {
 			defer func() {
 				gs.Expect(k8sClient.Delete(ctx, machine)).To(Succeed())
 			}()
-			// Verify the created Machine CR's providerSpec fields
-			machineProviderSpec, err := NutanixMachineProviderSpecFromRawExtension(machine.Spec.ProviderSpec.Value)
-			gs.Expect(err).ToNot(HaveOccurred())
-			g.Expect(machineProviderSpec.Subnets).Should(HaveLen(2))
 
 			// Ensure the machine has synced to the cache
 			getMachine := func() error {
@@ -296,5 +322,25 @@ func TestMachineEvents(t *testing.T) {
 				gs.Expect(k8sClient.Delete(ctx, &eventList.Items[i])).To(Succeed())
 			}
 		})
+	}
+}
+
+func validProviderSpec() *machinev1.NutanixMachineProviderConfig {
+	return &machinev1.NutanixMachineProviderConfig{
+		Cluster: machinev1.NutanixResourceIdentifier{Type: "name", Name: utils.StringPtr("ganon")},
+		Image:   machinev1.NutanixResourceIdentifier{Type: "name", Name: utils.StringPtr("rhcos-4.10-nutanix")},
+		Subnets: []machinev1.NutanixResourceIdentifier{
+			{Type: "name", Name: utils.StringPtr("sherlock_net")},
+		},
+		VCPUsPerSocket: 2,
+		VCPUSockets:    1,
+		MemorySize:     resource.MustParse("4096Mi"),
+		SystemDiskSize: resource.MustParse("120Gi"),
+		CredentialsSecret: &corev1.LocalObjectReference{
+			Name: credentialsSecretName,
+		},
+		UserDataSecret: &corev1.LocalObjectReference{
+			Name: userDataSecretName,
+		},
 	}
 }
