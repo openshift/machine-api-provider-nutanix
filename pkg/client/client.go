@@ -52,9 +52,6 @@ func Client(options *ClientOptions) (*nutanixClientV3.Client, error) {
 		options.Credentials.URL = fmt.Sprintf("%s:%s", options.Credentials.Endpoint, options.Credentials.Port)
 	}
 
-	// FIXME: Use insure connection for now. Will change to use secure connection later
-	options.Credentials.Insecure = true
-
 	klog.Infof("To create nutanixClient with creds: (url: %s, insecure: %v)", options.Credentials.URL, options.Credentials.Insecure)
 	cli, err := nutanixClientV3.NewV3Client(*options.Credentials, options.Debug)
 	if err != nil {
