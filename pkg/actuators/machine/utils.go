@@ -90,7 +90,7 @@ func NutanixMachineProviderStatusFromRawExtension(rawExtension *runtime.RawExten
 // The expected category (key/value) for the Nutanix resources (ex. vms, images)
 // created for the cluster
 const (
-	// Expected NutanixCategory Key format: "openshift-<cluster-id>"
+	// Expected NutanixCategory Key format: "kubernetes-io-cluster-<cluster-id>"
 	NutanixCategoryKeyPrefix = "kubernetes-io-cluster-"
 	NutanixCategoryValue     = "owned"
 )
