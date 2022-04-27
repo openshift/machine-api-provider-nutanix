@@ -10,6 +10,7 @@ import (
 
 	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix/v3"
 	"github.com/nutanix-cloud-native/prism-go-client/pkg/utils"
+	machinev1 "github.com/openshift/api/machine/v1"
 	clientpkg "github.com/openshift/machine-api-provider-nutanix/pkg/client"
 )
 
@@ -40,22 +41,44 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 		vmInput := nutanixClientV3.VMIntentInput{}
 		vmSpec := nutanixClientV3.VM{Name: utils.StringPtr(vmName)}
 
-		// subnet
-		var subnetUuidPtr *string
-		if mscp.providerSpec.Subnet.UUID != nil {
-			subnetUuidPtr = mscp.providerSpec.Subnet.UUID
-		} else if mscp.providerSpec.Subnet.Name != nil {
-			subnetUuidPtr, err = findSubenetUuidByName(mscp.nutanixClient, *mscp.providerSpec.Subnet.Name)
-			if err != nil {
-				return nil, err
-			}
+		// subnets
+		// Currently we only allow and support one subnet per VM
+		// We may extend to allow and support more than one subnets per VM, in the future release
+		if len(mscp.providerSpec.Subnets) > 1 {
+			return nil, fmt.Errorf("Currently we only allow and support one subnet per VM, but more than one subnets are configured.")
 		}
-		vmNic := &nutanixClientV3.VMNic{
-			SubnetReference: &nutanixClientV3.Reference{
-				Kind: utils.StringPtr("subnet"),
-				UUID: subnetUuidPtr,
-			}}
-		nicList := []*nutanixClientV3.VMNic{vmNic}
+
+		nicList := []*nutanixClientV3.VMNic{}
+		for _, subnet := range mscp.providerSpec.Subnets {
+			var subnetUuidPtr *string
+			switch subnet.Type {
+			case machinev1.NutanixIdentifierUUID:
+				if subnet.UUID == nil {
+					return nil, fmt.Errorf("The subnet identifier type is 'uuid', but the uuid data is not provided")
+				}
+				subnetUuidPtr = subnet.UUID
+			case machinev1.NutanixIdentifierName:
+				if subnet.Name == nil {
+					return nil, fmt.Errorf("The subnet identifier type is 'name', but the name data is not provided")
+				}
+				subnetUuidPtr, err = findSubnetUuidByName(mscp.nutanixClient, *subnet.Name)
+				if err != nil {
+					return nil, err
+				}
+			default:
+				return nil, fmt.Errorf("The subnet identifier type is not supported: %v", subnet.Type)
+			}
+
+			vmNic := &nutanixClientV3.VMNic{
+				SubnetReference: &nutanixClientV3.Reference{
+					Kind: utils.StringPtr("subnet"),
+					UUID: subnetUuidPtr,
+				}}
+			nicList = append(nicList, vmNic)
+		}
+		if len(nicList) == 0 {
+			return nil, fmt.Errorf("No valid subnet is configured for vm %q", vmName)
+		}
 
 		// rhcos image system disk
 		var imageUuidPtr *string
@@ -260,8 +283,8 @@ func findImageUuidByName(ntnxclient *nutanixClientV3.Client, imageName string) (
 	return res.Entities[0].Metadata.UUID, nil
 }
 
-// findSubenetUuidByName retrieves the subnet uuid by the given subnet name
-func findSubenetUuidByName(ntnxclient *nutanixClientV3.Client, subnetName string) (*string, error) {
+// findSubnetUuidByName retrieves the subnet uuid by the given subnet name
+func findSubnetUuidByName(ntnxclient *nutanixClientV3.Client, subnetName string) (*string, error) {
 	klog.Infof("Checking if subnet with name %q exists.", subnetName)
 
 	res, err := ntnxclient.V3.ListSubnet(&nutanixClientV3.DSMetadata{
