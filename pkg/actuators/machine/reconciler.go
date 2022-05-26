@@ -131,25 +131,31 @@ func (r *Reconciler) update() error {
 
 // delete deletes VM
 func (r *Reconciler) delete() error {
-	var err error
 	klog.Infof("%s: deleting machine's vm", r.machine.Name)
 
-	if r.providerStatus.VmUUID == nil {
-		klog.Warningf("%s: cannot delete a vm not yet created, the vmUUID is null.", r.machine.Name)
-		return nil
-	}
+	var err error
+	var vm *nutanixClientV3.VMIntentResponse
 
-	vmUuid := *r.providerStatus.VmUUID
-	_, err = findVMByUUID(r.nutanixClient, vmUuid)
+	// Check if the machine vm exists
+	if r.providerStatus.VmUUID != nil {
+		// Try to find the vm by uuid
+		vm, err = findVMByUUID(r.nutanixClient, *r.providerStatus.VmUUID)
+	} else {
+		// Try to find the vm by name
+		vm, err = findVMByName(r.nutanixClient, r.machine.Name)
+	}
 	if err != nil {
 		if strings.Contains(err.Error(), "NOT_FOUND") {
-			klog.Warningf("%s: vm with uuid %s does not exist", r.machine.Name, vmUuid)
+			// Not found the machine vm, could be deleted or not created yet.
+			klog.Warningf("%s: the machine vm does not exist", r.machine.Name)
 			return nil
 		}
 
-		klog.Errorf("%s: error finding vm with uuid %s", r.machine.Name, vmUuid)
+		klog.Errorf("%s: error finding the machine vm. %v", r.machine.Name, err)
 		return err
 	}
+
+	vmUuid := *vm.Metadata.UUID
 
 	// Ensure volumes are detached before deleting the Node.
 	if r.isNodeLinked() {
