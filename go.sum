@@ -520,8 +520,8 @@ github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f/go.mod h1:qRW
 github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f/go.mod h1:ZdcZmHo+o7JKHSa8/e818NopupXU1YMK5fe1lsApnBw=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e h1:fD57ERR4JtEqsWbfPhv4DMiApHyliiK5xCTNVSPiaAs=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
-github.com/nutanix-cloud-native/prism-go-client v0.0.0-20211220162817-689f23de3cdc h1:gyjB3R/J5OM8sPjP2CJG24bPSs7bjPQW5rlH15Oft0o=
-github.com/nutanix-cloud-native/prism-go-client v0.0.0-20211220162817-689f23de3cdc/go.mod h1:2TD5wC3Ksuhp3RIj5kcC8W7T+uqGHT5yrFOAUNVknLA=
+github.com/nutanix-cloud-native/prism-go-client v0.0.0-20220511213441-cc121d3d3c27 h1:q5UWBMUuxHmDmjXo9DqP6T2Vh9E5YQBnkHnwdWU5vsk=
+github.com/nutanix-cloud-native/prism-go-client v0.0.0-20220511213441-cc121d3d3c27/go.mod h1:2TD5wC3Ksuhp3RIj5kcC8W7T+uqGHT5yrFOAUNVknLA=
 github.com/nxadm/tail v1.4.4/go.mod h1:kenIhsEOeOJmVchQTgglprH7qJGnHDVpk1VPCcaMI8A=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
 github.com/nxadm/tail v1.4.8/go.mod h1:+ncqLTQzXmGhMZNUePPaPqPvBxHAIsmXswZKocGu+AU=

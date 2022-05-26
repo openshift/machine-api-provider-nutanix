@@ -6,7 +6,7 @@ require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/go-logr/logr v1.2.2
 	github.com/golang/mock v1.5.0
-	github.com/nutanix-cloud-native/prism-go-client v0.0.0-20211220162817-689f23de3cdc
+	github.com/nutanix-cloud-native/prism-go-client v0.0.0-20220511213441-cc121d3d3c27
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.17.0
 	github.com/openshift/api v0.0.0-20220427141643-6e7069f2fba2

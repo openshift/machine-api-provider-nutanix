@@ -159,7 +159,7 @@ github.com/modern-go/reflect2
 # github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00
 ## explicit
 github.com/monochromegane/go-gitignore
-# github.com/nutanix-cloud-native/prism-go-client v0.0.0-20211220162817-689f23de3cdc
+# github.com/nutanix-cloud-native/prism-go-client v0.0.0-20220511213441-cc121d3d3c27
 ## explicit; go 1.16
 github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix
 github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix/v3
