@@ -9,16 +9,16 @@ require (
 	github.com/nutanix-cloud-native/prism-go-client v0.0.0-20220511213441-cc121d3d3c27
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.17.0
-	github.com/openshift/api v0.0.0-20220427141643-6e7069f2fba2
-	github.com/openshift/machine-api-operator v0.2.1-0.20220509160407-25e61c2d0120
+	github.com/openshift/api master
+	github.com/openshift/machine-api-operator master
 
-	// kube 1.23
-	k8s.io/api v0.23.0
-	k8s.io/apimachinery v0.23.0
-	k8s.io/client-go v0.23.0
+	// kube 1.24
+	k8s.io/api v0.24.1
+	k8s.io/apimachinery v0.24.1
+	k8s.io/client-go v0.24.1
 	k8s.io/klog/v2 v2.30.0
-	sigs.k8s.io/controller-runtime v0.11.0
-	sigs.k8s.io/controller-tools v0.7.0
+	sigs.k8s.io/controller-runtime latest
+	sigs.k8s.io/controller-tools latest
 )
 
 require k8s.io/klog v1.0.0
