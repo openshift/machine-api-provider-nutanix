@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2"
 
 	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix/v3"
@@ -13,6 +14,177 @@ import (
 	machinev1 "github.com/openshift/api/machine/v1"
 	clientpkg "github.com/openshift/machine-api-provider-nutanix/pkg/client"
 )
+
+// validateVMConfig verifies if the machine's VM configuration is valid
+func validateVMConfig(mscp *machineScope) field.ErrorList {
+	errList := field.ErrorList{}
+	fldPath := field.NewPath("spec", "providerSpec", "value")
+	var errMsg string
+
+	// verify the cluster configuration
+	if fldErr := validateClusterConfig(mscp, fldPath); fldErr != nil {
+		errList = append(errList, fldErr)
+	}
+
+	// verify the image configuration
+	if fldErr := validateImageConfig(mscp, fldPath); fldErr != nil {
+		errList = append(errList, fldErr)
+	}
+
+	// verify the subnets configuration
+	// Currently we only allow and support one subnet per VM
+	// We may extend to allow and support more than one subnets per VM, in the future release
+	if len(mscp.providerSpec.Subnets) == 0 {
+		errList = append(errList, field.Required(fldPath.Child("subnets"), "Missing subnets"))
+
+	} else if len(mscp.providerSpec.Subnets) > 1 {
+		errMsg = "Currently we only allow and support one subnet per VM, but more than one subnets are configured."
+		errList = append(errList, field.Invalid(fldPath.Child("subnets"), len(mscp.providerSpec.Subnets), errMsg))
+
+	} else {
+		subnet := &mscp.providerSpec.Subnets[0]
+		if fldErr := validateSubnetConfig(mscp, subnet, fldPath); fldErr != nil {
+			errList = append(errList, fldErr)
+		}
+	}
+
+	// verify the vcpusPerSocket configuration
+	if mscp.providerSpec.VCPUsPerSocket < 1 {
+		errMsg = "The minimum number of vCPUs per socket of the VM is 1."
+		errList = append(errList, field.Invalid(fldPath.Child("vcpusPerSocket"), mscp.providerSpec.VCPUsPerSocket, errMsg))
+	}
+
+	// verify the vcpuSockets configuration
+	if mscp.providerSpec.VCPUSockets < 1 {
+		errMsg = "The minimum vCPU sockets of the VM is 1."
+		errList = append(errList, field.Invalid(fldPath.Child("vcpuSockets"), mscp.providerSpec.VCPUSockets, errMsg))
+	}
+
+	// verify the memorySize configuration
+	// The minimum memorySize is 2Gi bytes
+	memSizeMib := GetMibValueOfQuantity(mscp.providerSpec.MemorySize)
+	if memSizeMib < 2*1024 {
+		errList = append(errList, field.Invalid(fldPath.Child("memorySize"), fmt.Sprintf("%vMib", memSizeMib), "The minimum memorySize is 2Gi bytes"))
+	}
+
+	// verify the systemDiskSize configuration
+	// The minimum systemDiskSize is 20Gi bytes
+	diskSizeMib := GetMibValueOfQuantity(mscp.providerSpec.SystemDiskSize)
+	if diskSizeMib < 20*1024 {
+		errList = append(errList, field.Invalid(fldPath.Child("systemDiskSize"), fmt.Sprintf("%vGib", diskSizeMib/1024), "The minimum systemDiskSize is 20Gi bytes"))
+	}
+
+	return errList
+}
+
+func validateClusterConfig(mscp *machineScope, fldPath *field.Path) *field.Error {
+	var err error
+	var errMsg string
+
+	switch mscp.providerSpec.Cluster.Type {
+	case machinev1.NutanixIdentifierName:
+		if mscp.providerSpec.Cluster.Name == nil || *mscp.providerSpec.Cluster.Name == "" {
+			return field.Required(fldPath.Child("cluster", "name"), "Missing cluster name")
+		} else {
+			clusterName := *mscp.providerSpec.Cluster.Name
+			clusterRefUuidPtr, err := findClusterUuidByName(mscp.nutanixClient, clusterName)
+			if err != nil {
+				errMsg = fmt.Sprintf("Failed to find cluster with name %q. error: %v", clusterName, err)
+				return field.Invalid(fldPath.Child("cluster", "name"), clusterName, errMsg)
+			} else {
+				mscp.providerSpec.Cluster.Type = machinev1.NutanixIdentifierUUID
+				mscp.providerSpec.Cluster.UUID = clusterRefUuidPtr
+			}
+		}
+	case machinev1.NutanixIdentifierUUID:
+		if mscp.providerSpec.Cluster.UUID == nil || *mscp.providerSpec.Cluster.UUID == "" {
+			return field.Required(fldPath.Child("cluster", "uuid"), "Missing cluster uuid")
+		} else {
+			clusterUUID := *mscp.providerSpec.Cluster.UUID
+			if _, err = mscp.nutanixClient.V3.GetCluster(clusterUUID); err != nil {
+				errMsg = fmt.Sprintf("Failed to find cluster with uuid %v. error: %v", clusterUUID, err)
+				return field.Invalid(fldPath.Child("cluster", "uuid"), clusterUUID, errMsg)
+			}
+		}
+	default:
+		errMsg = fmt.Sprintf("Invalid cluster identifier type, valid types are: %q, %q.", machinev1.NutanixIdentifierName, machinev1.NutanixIdentifierUUID)
+		return field.Invalid(fldPath.Child("cluster", "type"), mscp.providerSpec.Cluster.Type, errMsg)
+	}
+
+	return nil
+}
+
+func validateImageConfig(mscp *machineScope, fldPath *field.Path) *field.Error {
+	var err error
+	var errMsg string
+
+	switch mscp.providerSpec.Image.Type {
+	case machinev1.NutanixIdentifierName:
+		if mscp.providerSpec.Image.Name == nil || *mscp.providerSpec.Image.Name == "" {
+			return field.Required(fldPath.Child("image", "name"), "Missing image name")
+		} else {
+			imageName := *mscp.providerSpec.Image.Name
+			imageRefUuidPtr, err := findImageUuidByName(mscp.nutanixClient, imageName)
+			if err != nil {
+				errMsg = fmt.Sprintf("Failed to find image with name %q. error: %v", imageName, err)
+				return field.Invalid(fldPath.Child("image", "name"), imageName, errMsg)
+			} else {
+				mscp.providerSpec.Image.Type = machinev1.NutanixIdentifierUUID
+				mscp.providerSpec.Image.UUID = imageRefUuidPtr
+			}
+		}
+	case machinev1.NutanixIdentifierUUID:
+		if mscp.providerSpec.Image.UUID == nil || *mscp.providerSpec.Image.UUID == "" {
+			return field.Required(fldPath.Child("image", "uuid"), "Missing image uuid")
+		} else {
+			imageUUID := *mscp.providerSpec.Image.UUID
+			if _, err = mscp.nutanixClient.V3.GetImage(imageUUID); err != nil {
+				errMsg = fmt.Sprintf("Failed to find image with uuid %v. error: %v", imageUUID, err)
+				return field.Invalid(fldPath.Child("image", "uuid"), imageUUID, errMsg)
+			}
+		}
+	default:
+		errMsg = fmt.Sprintf("Invalid image identifier type, valid types are: %q, %q.", machinev1.NutanixIdentifierName, machinev1.NutanixIdentifierUUID)
+		return field.Invalid(fldPath.Child("image", "type"), mscp.providerSpec.Image.Type, errMsg)
+	}
+
+	return nil
+}
+
+func validateSubnetConfig(mscp *machineScope, subnet *machinev1.NutanixResourceIdentifier, fldPath *field.Path) *field.Error {
+	var err error
+	var errMsg string
+
+	switch subnet.Type {
+	case machinev1.NutanixIdentifierName:
+		if subnet.Name == nil || *subnet.Name == "" {
+			return field.Required(fldPath.Child("subnet", "name"), "Missing subnet name")
+		} else {
+			subnetRefUuidPtr, err := findSubnetUuidByName(mscp.nutanixClient, *subnet.Name)
+			if err != nil {
+				errMsg = fmt.Sprintf("Failed to find subnet with name %q. error: %v", *subnet.Name, err)
+				return field.Invalid(fldPath.Child("subnet", "name"), *subnet.Name, errMsg)
+			} else {
+				subnet.Type = machinev1.NutanixIdentifierUUID
+				subnet.UUID = subnetRefUuidPtr
+			}
+		}
+	case machinev1.NutanixIdentifierUUID:
+		if subnet.UUID == nil || *subnet.UUID == "" {
+			return field.Required(fldPath.Child("subnet").Child("uuid"), "Missing subnet uuid")
+		} else {
+			if _, err = mscp.nutanixClient.V3.GetSubnet(*subnet.UUID); err != nil {
+				errMsg = fmt.Sprintf("Failed to find subnet with uuid %v. error: %v", *subnet.UUID, err)
+				return field.Invalid(fldPath.Child("subnet", "uuid"), *subnet.UUID, errMsg)
+			}
+		}
+	default:
+		errMsg = fmt.Sprintf("Invalid subnet identifier type, valid types are: %q, %q.", machinev1.NutanixIdentifierName, machinev1.NutanixIdentifierUUID)
+		return field.Invalid(fldPath.Child("subnet", "type"), subnet.Type, errMsg)
+	}
+
+	return nil
+}
 
 // CreateVM creates a VM and is invoked by the NutanixMachineReconciler
 func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentResponse, error) {
@@ -41,61 +213,22 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 		vmInput := nutanixClientV3.VMIntentInput{}
 		vmSpec := nutanixClientV3.VM{Name: utils.StringPtr(vmName)}
 
-		// subnets
-		// Currently we only allow and support one subnet per VM
-		// We may extend to allow and support more than one subnets per VM, in the future release
-		if len(mscp.providerSpec.Subnets) > 1 {
-			return nil, fmt.Errorf("Currently we only allow and support one subnet per VM, but more than one subnets are configured.")
-		}
-
 		nicList := []*nutanixClientV3.VMNic{}
 		for _, subnet := range mscp.providerSpec.Subnets {
-			var subnetUuidPtr *string
-			switch subnet.Type {
-			case machinev1.NutanixIdentifierUUID:
-				if subnet.UUID == nil {
-					return nil, fmt.Errorf("The subnet identifier type is 'uuid', but the uuid data is not provided")
-				}
-				subnetUuidPtr = subnet.UUID
-			case machinev1.NutanixIdentifierName:
-				if subnet.Name == nil {
-					return nil, fmt.Errorf("The subnet identifier type is 'name', but the name data is not provided")
-				}
-				subnetUuidPtr, err = findSubnetUuidByName(mscp.nutanixClient, *subnet.Name)
-				if err != nil {
-					return nil, err
-				}
-			default:
-				return nil, fmt.Errorf("The subnet identifier type is not supported: %v", subnet.Type)
-			}
-
 			vmNic := &nutanixClientV3.VMNic{
 				SubnetReference: &nutanixClientV3.Reference{
 					Kind: utils.StringPtr("subnet"),
-					UUID: subnetUuidPtr,
+					UUID: subnet.UUID,
 				}}
 			nicList = append(nicList, vmNic)
 		}
-		if len(nicList) == 0 {
-			return nil, fmt.Errorf("No valid subnet is configured for vm %q", vmName)
-		}
 
 		// rhcos image system disk
-		var imageUuidPtr *string
-		if mscp.providerSpec.Image.UUID != nil {
-			imageUuidPtr = mscp.providerSpec.Image.UUID
-		} else if mscp.providerSpec.Image.Name != nil {
-			imageUuidPtr, err = findImageUuidByName(mscp.nutanixClient, *mscp.providerSpec.Image.Name)
-			if err != nil {
-				return nil, err
-			}
-
-		}
 		diskList := []*nutanixClientV3.VMDisk{}
 		diskList = append(diskList, &nutanixClientV3.VMDisk{
 			DataSourceReference: &nutanixClientV3.Reference{
 				Kind: utils.StringPtr("image"),
-				UUID: imageUuidPtr,
+				UUID: mscp.providerSpec.Image.UUID,
 			},
 			DiskSizeMib: utils.Int64Ptr(GetMibValueOfQuantity(mscp.providerSpec.SystemDiskSize)),
 		})
@@ -127,18 +260,9 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 		}
 
 		// Set cluster/PE reference
-		var clusterRefUuidPtr *string
-		if mscp.providerSpec.Cluster.UUID != nil {
-			clusterRefUuidPtr = mscp.providerSpec.Cluster.UUID
-		} else if mscp.providerSpec.Cluster.Name != nil {
-			clusterRefUuidPtr, err = findClusterUuidByName(mscp.nutanixClient, *mscp.providerSpec.Cluster.Name)
-			if err != nil {
-				return nil, err
-			}
-		}
 		vmSpec.ClusterReference = &nutanixClientV3.Reference{
 			Kind: utils.StringPtr("cluster"),
-			UUID: clusterRefUuidPtr,
+			UUID: mscp.providerSpec.Cluster.UUID,
 		}
 
 		vmInput.Spec = &vmSpec

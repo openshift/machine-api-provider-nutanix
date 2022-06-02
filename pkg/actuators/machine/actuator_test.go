@@ -131,7 +131,7 @@ func TestMachineEvents(t *testing.T) {
 		providerSpec *machinev1.NutanixMachineProviderConfig
 		error        string
 		operation    func(actuator *Actuator, machine *machinev1beta1.Machine)
-		event        string
+		events       []string
 	}{
 		{
 			name:         "Create machine failed on invalid machine scope",
@@ -140,7 +140,7 @@ func TestMachineEvents(t *testing.T) {
 			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
 				actuator.Create(nil, machine)
 			},
-			event: "context and machine should not be nil",
+			events: []string{"context and machine should not be nil"},
 		},
 		{
 			name:         "Create machine failed on missing required label",
@@ -150,47 +150,33 @@ func TestMachineEvents(t *testing.T) {
 				machine.Labels[machinev1beta1.MachineClusterIDLabel] = ""
 				actuator.Create(ctx, machine)
 			},
-			event: "missing \"machine.openshift.io/cluster-api-cluster\" label",
+			events: []string{"missing \"machine.openshift.io/cluster-api-cluster\" label"},
 		},
 		{
-			name:        "Create machine failed on missing required subnets",
+			name:        "Create machine failed on configuration errors",
 			machineName: "test-machine",
 			providerSpec: func() *machinev1.NutanixMachineProviderConfig {
 				pspec := validProviderSpec()
-				pspec.Subnets = []machinev1.NutanixResourceIdentifier{}
-				return pspec
-			}(),
-			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
-				actuator.Create(ctx, machine)
-			},
-			event: "No valid subnet is configured",
-		},
-		{
-			name:        "Create machine failed on configuring more than one subnets",
-			machineName: "test-machine",
-			providerSpec: func() *machinev1.NutanixMachineProviderConfig {
-				pspec := validProviderSpec()
+				pspec.Cluster.Type = "invalid-type"
+				pspec.Image.Name = nil
 				pspec.Subnets = append(pspec.Subnets,
 					machinev1.NutanixResourceIdentifier{Type: "uuid", UUID: utils.StringPtr("c7938dc6-7659-453e-a688-e26020c68g02")})
+				pspec.VCPUSockets = 0
+				pspec.MemorySize = resource.MustParse("1.5Gi")
+				pspec.SystemDiskSize = resource.MustParse("18Gi")
 				return pspec
 			}(),
 			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
 				actuator.Create(ctx, machine)
 			},
-			event: "more than one subnets are configured",
-		},
-		{
-			name:        "Create machine failed on missing/invalid subnet identifier",
-			machineName: "test-machine",
-			providerSpec: func() *machinev1.NutanixMachineProviderConfig {
-				pspec := validProviderSpec()
-				pspec.Subnets[0].Type = ""
-				return pspec
-			}(),
-			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
-				actuator.Create(ctx, machine)
+			events: []string{
+				"Invalid cluster identifier type",
+				"Missing image name",
+				"more than one subnets are configured",
+				"The minimum vCPU sockets of the VM is 1",
+				"The minimum memorySize is 2Gi bytes",
+				"The minimum systemDiskSize is 20Gi bytes",
 			},
-			event: "The subnet identifier type is not supported",
 		},
 		{
 			name:         "Update machine failed on invalid machine scope",
@@ -199,7 +185,7 @@ func TestMachineEvents(t *testing.T) {
 			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
 				actuator.Update(nil, machine)
 			},
-			event: "context and machine should not be nil",
+			events: []string{"context and machine should not be nil"},
 		},
 		{
 			name:         "Update failed on missing required label",
@@ -209,7 +195,7 @@ func TestMachineEvents(t *testing.T) {
 				machine.Labels[machinev1beta1.MachineClusterIDLabel] = ""
 				actuator.Update(ctx, machine)
 			},
-			event: "missing \"machine.openshift.io/cluster-api-cluster\" label",
+			events: []string{"missing \"machine.openshift.io/cluster-api-cluster\" label"},
 		},
 		{
 			name:         "Delete machine event failed on invalid machine scope",
@@ -218,7 +204,7 @@ func TestMachineEvents(t *testing.T) {
 			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
 				actuator.Delete(nil, machine)
 			},
-			event: "context and machine should not be nil",
+			events: []string{"context and machine should not be nil"},
 		},
 	}
 
@@ -316,7 +302,9 @@ func TestMachineEvents(t *testing.T) {
 
 			gs.Eventually(waitForEvent, timeout).Should(Succeed())
 
-			gs.Expect(eventList.Items[0].Message).To(ContainSubstring(tc.event))
+			for _, msg := range tc.events {
+				gs.Expect(eventList.Items[0].Message).To(ContainSubstring(msg))
+			}
 
 			for i := range eventList.Items {
 				gs.Expect(k8sClient.Delete(ctx, &eventList.Items[i])).To(Succeed())
