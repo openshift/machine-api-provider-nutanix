@@ -51,6 +51,13 @@ func (r *Reconciler) create() error {
 		return fmt.Errorf("failed to get user data: %w", err)
 	}
 
+	if errList := validateVMConfig(r.machineScope); len(errList) > 0 {
+		machineErr := machinecontroller.InvalidMachineConfiguration(
+			"%v: failed in validating machine providerSpec: %v",
+			r.machine.GetName(), errList.ToAggregate().Error())
+		return machineErr
+	}
+
 	vm, err := createVM(r.machineScope, userData)
 	if err != nil {
 		klog.Errorf("%s: error creating machine vm. error: %v", r.machine.Name, err)
