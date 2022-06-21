@@ -91,9 +91,10 @@ func newMachineScope(params machineScopeParams) (*machineScope, error) {
 
 func (s *machineScope) getNutanixClientOptions() (*clientpkg.ClientOptions, error) {
 
+	debugEnabled := klog.V(5).Enabled()
 	clientOptions := &clientpkg.ClientOptions{
 		Credentials: &nutanixClient.Credentials{},
-		Debug:       true,
+		Debug:       debugEnabled,
 	}
 
 	// Get the PC endpoint/port from the Infrastructure CR
