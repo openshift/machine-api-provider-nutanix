@@ -52,7 +52,7 @@ func Client(options *ClientOptions) (*nutanixClientV3.Client, error) {
 		options.Credentials.URL = fmt.Sprintf("%s:%s", options.Credentials.Endpoint, options.Credentials.Port)
 	}
 
-	klog.Infof("To create nutanixClient with creds: (url: %s, insecure: %v)", options.Credentials.URL, options.Credentials.Insecure)
+	klog.Infof("To create nutanixClient with creds: (url: %s, insecure: %v, debug-log: %v)", options.Credentials.URL, options.Credentials.Insecure, options.Debug)
 	cli, err := nutanixClientV3.NewV3Client(*options.Credentials, options.Debug)
 	if err != nil {
 		klog.Errorf("Failed to create the nutanix client. error: %v", err)
