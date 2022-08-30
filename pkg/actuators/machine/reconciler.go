@@ -304,19 +304,36 @@ func (r *Reconciler) updateMachineWithVMState(vm *nutanixClientV3.VMIntentRespon
 	}
 
 	klog.Infof("%s: updating machine providerID", r.machine.Name)
-	if err := r.setProviderID(vm.Metadata.UUID); err != nil {
+	err := r.setProviderID(vm.Metadata.UUID)
+	if err != nil {
 		return err
 	}
 
+	pcCluster, err := getPrismCentralCluster(r.nutanixClient)
+	if err != nil {
+		klog.Errorf("%s: failed to get prism central cluster. %w", r.machine.Name, err)
+		return err
+	}
+
+	vmRegion := *pcCluster.Spec.Name
+	vmZone := *vm.Status.ClusterReference.Name
 	vmType := stringPointerDeref(vm.Status.Resources.HypervisorType)
 	vmState := stringPointerDeref(vm.Status.State)
 	powerState := stringPointerDeref(vm.Status.Resources.PowerState)
+
+	if r.machine.Labels == nil {
+		r.machine.Labels = map[string]string{}
+	}
+	r.machine.Labels[machinecontroller.MachineRegionLabelName] = vmRegion
+	r.machine.Labels[machinecontroller.MachineAZLabelName] = vmZone
+	r.machine.Labels[machinecontroller.MachineInstanceTypeLabelName] = vmType
+
 	if r.machine.Annotations == nil {
 		r.machine.Annotations = map[string]string{}
 	}
-	r.machine.Annotations[machinecontroller.MachineInstanceTypeLabelName] = vmType
 	r.machine.Annotations[machinecontroller.MachineInstanceStateAnnotationName] = vmState
 	r.machine.Annotations[MachineInstancePowerStateAnnotationName] = powerState
+
 	klog.Infof("%s: updated machine instance state annotations (%s: %s), (%s: %s), (%s: %s)", r.machine.Name,
 		machinecontroller.MachineInstanceTypeLabelName, vmType,
 		machinecontroller.MachineInstanceStateAnnotationName, vmState,

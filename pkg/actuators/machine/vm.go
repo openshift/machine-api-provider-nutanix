@@ -427,3 +427,31 @@ func findSubnetUuidByName(ntnxclient *nutanixClientV3.Client, subnetName string)
 
 	return res.Entities[0].Metadata.UUID, nil
 }
+
+func getPrismCentralCluster(ntnxclient *nutanixClientV3.Client) (*nutanixClientV3.ClusterIntentResponse, error) {
+	const filter = ""
+	clusterList, err := ntnxclient.V3.ListAllCluster(filter)
+	if err != nil {
+		return nil, err
+	}
+
+	foundPCs := make([]*nutanixClientV3.ClusterIntentResponse, 0)
+	for _, cl := range clusterList.Entities {
+		if cl.Status != nil && cl.Status.Resources != nil && cl.Status.Resources.Config != nil {
+			serviceList := cl.Status.Resources.Config.ServiceList
+			for _, svc := range serviceList {
+				if svc != nil && strings.ToUpper(*svc) == "PRISM_CENTRAL" {
+					foundPCs = append(foundPCs, cl)
+				}
+			}
+		}
+	}
+	numFoundPCs := len(foundPCs)
+	if numFoundPCs == 1 {
+		return foundPCs[0], nil
+	}
+	if len(foundPCs) == 0 {
+		return nil, fmt.Errorf("failed to retrieve Prism Central cluster")
+	}
+	return nil, fmt.Errorf("found more than one Prism Central cluster: %v", numFoundPCs)
+}
