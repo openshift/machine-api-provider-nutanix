@@ -428,13 +428,13 @@ func findSubnetUuidByName(ntnxclient *nutanixClientV3.Client, subnetName string)
 	return res.Entities[0].Metadata.UUID, nil
 }
 
-func getPrismCentralCluster(ntnxclient *nutanixClientV3.Client) (*nutanixClientV3.ClusterIntentResource, error) {
-	clusterList, err := ntnxclient.V3.ListAllCluster()
+func getPrismCentralCluster(ntnxclient *nutanixClientV3.Client) (*nutanixClientV3.ClusterIntentResponse, error) {
+	clusterList, err := ntnxclient.V3.ListAllCluster("")
 	if err != nil {
 		return nil, err
 	}
 
-	foundPCs := make([]*nutanixClientV3.ClusterIntentResource, 0)
+	foundPCs := make([]*nutanixClientV3.ClusterIntentResponse, 0)
 	for _, cl := range clusterList.Entities {
 		if cl.Status != nil && cl.Status.Resources != nil && cl.Status.Resources.Config != nil {
 			serviceList := cl.Status.Resources.Config.ServiceList
