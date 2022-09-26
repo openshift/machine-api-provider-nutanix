@@ -316,7 +316,13 @@ func (r *Reconciler) updateMachineWithVMState(vm *nutanixClientV3.VMIntentRespon
 	}
 
 	vmRegion := *pcCluster.Spec.Name
+	if vmRegion == "Unnamed" {
+		klog.Warningf("%s: the machine.openshift.io/region label value is 'Unnamed', due to the prism-central cluster name not being set.", r.machine.Name)
+	}
 	vmZone := *vm.Status.ClusterReference.Name
+	if vmZone == "Unnamed" {
+		klog.Warningf("%s: the machine.openshift.io/zone label value is 'Unnamed', due to the prism-element cluster name not being set.", r.machine.Name)
+	}
 	vmType := stringPointerDeref(vm.Status.Resources.HypervisorType)
 
 	if r.machine.Labels == nil {
