@@ -267,11 +267,13 @@ func (r *Reconciler) setProviderID(vmUUID *string) error {
 		klog.Infof("%s: ProviderID set at machine.spec: %s", r.machine.Name, providerID)
 	}
 
-	// update the corresponding node.Spec.ProviderID
-	var nodeName string
-	if r.machine.Status.NodeRef != nil {
-		nodeName = r.machine.Status.NodeRef.Name
+	if r.machine.Status.NodeRef == nil {
+		klog.Infof("%s: the Machine node is not ready yet.", r.machine.Name)
+		return nil
 	}
+
+	// update the corresponding node.Spec.ProviderID
+	nodeName := r.machine.Status.NodeRef.Name
 	if len(nodeName) == 0 {
 		nodeName = r.machine.Name
 	}

@@ -95,10 +95,20 @@ const (
 	NutanixCategoryValue     = "owned"
 )
 
-// Add the category for installer clueanup the Machine VM at cluster torn-down time
-// if the category exists in PC.
-func addCategory(mscp *machineScope, vmMetadata *nutanixClientV3.Metadata) error {
+// addCategories adds the category for installer clueanup the Machine VM
+// at cluster torn-down time if the category exists in PC.
+// Add the addtional categories to the Machine VM if configured
+func addCategories(mscp *machineScope, vmMetadata *nutanixClientV3.Metadata) error {
 	var err error
+	if vmMetadata.Categories == nil {
+		vmMetadata.Categories = make(map[string]string, len(mscp.providerSpecValidated.Categories)+1)
+	}
+
+	// The addtional categories are already verified
+	for _, category := range mscp.providerSpecValidated.Categories {
+		vmMetadata.Categories[category.Key] = category.Value
+	}
+
 	clusterID, ok := getClusterID(mscp.machine)
 	if !ok || clusterID == "" {
 		err = fmt.Errorf("%s: failed to get the clusterID", mscp.machine.Name)
@@ -113,10 +123,6 @@ func addCategory(mscp *machineScope, vmMetadata *nutanixClientV3.Metadata) error
 		return err
 	}
 
-	// Add the category to the vm metadata
-	if vmMetadata.Categories == nil {
-		vmMetadata.Categories = make(map[string]string, 1)
-	}
 	vmMetadata.Categories[categoryKey] = NutanixCategoryValue
 
 	return nil

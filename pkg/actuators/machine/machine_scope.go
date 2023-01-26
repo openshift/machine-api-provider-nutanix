@@ -49,6 +49,9 @@ type machineScope struct {
 	machineToBePatched runtimeclient.Patch
 	providerSpec       *machinev1.NutanixMachineProviderConfig
 	providerStatus     *machinev1.NutanixMachineProviderStatus
+	// For Machine vm create/update use, take a copy of the providerSpec that we can mutate.
+	// This must never be written back to the Machine itself.
+	providerSpecValidated *machinev1.NutanixMachineProviderConfig
 }
 
 func newMachineScope(params machineScopeParams) (*machineScope, error) {
