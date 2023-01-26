@@ -74,6 +74,17 @@ func validateVMConfig(mscp *machineScope) field.ErrorList {
 		errList = append(errList, field.Invalid(fldPath.Child("systemDiskSize"), fmt.Sprintf("%vGib", diskSizeMib/1024), "The minimum systemDiskSize is 20Gi bytes"))
 	}
 
+	// verify the bootType configurations
+	// Type bootType field is optional, and valid values include: "", Legacy, UEFI, SecureBoot
+	switch mscp.providerSpec.BootType {
+	case "", machinev1.NutanixLegacyBoot, machinev1.NutanixUEFIBoot, machinev1.NutanixSecureBoot:
+		// valid bootType
+	default:
+		errMsg = fmt.Sprintf("Invalid bootType, the valid bootType values are: \"\", %q, %q, %q.",
+			machinev1.NutanixLegacyBoot, machinev1.NutanixUEFIBoot, machinev1.NutanixSecureBoot)
+		errList = append(errList, field.Invalid(fldPath.Child("bootType"), mscp.providerSpec.BootType, errMsg))
+	}
+
 	return errList
 }
 
@@ -263,6 +274,15 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 		vmSpec.ClusterReference = &nutanixClientV3.Reference{
 			Kind: utils.StringPtr("cluster"),
 			UUID: mscp.providerSpec.Cluster.UUID,
+		}
+
+		// Set boot_type if configured in the machine's providerSpec
+		if mscp.providerSpec.BootType == machinev1.NutanixUEFIBoot {
+			vmSpec.Resources.BootConfig.BootType = utils.StringPtr("UEFI")
+		} else if mscp.providerSpec.BootType == machinev1.NutanixSecureBoot {
+			vmSpec.Resources.BootConfig.BootType = utils.StringPtr("SECURE_BOOT")
+		} else {
+			// The vm uses the default "LEGACY" boot type
 		}
 
 		vmInput.Spec = &vmSpec

@@ -164,6 +164,7 @@ func TestMachineEvents(t *testing.T) {
 				pspec.VCPUSockets = 0
 				pspec.MemorySize = resource.MustParse("1.5Gi")
 				pspec.SystemDiskSize = resource.MustParse("18Gi")
+				pspec.BootType = "invalid-boottype"
 				return pspec
 			}(),
 			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
@@ -176,6 +177,7 @@ func TestMachineEvents(t *testing.T) {
 				"The minimum vCPU sockets of the VM is 1",
 				"The minimum memorySize is 2Gi bytes",
 				"The minimum systemDiskSize is 20Gi bytes",
+				"Invalid bootType, the valid bootType values are: \"\", \"Legacy\", \"UEFI\", \"SecureBoot\"",
 			},
 		},
 		{
