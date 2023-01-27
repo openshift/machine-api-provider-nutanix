@@ -13,4 +13,4 @@ reviewers:
 - lobziik
 - odvarkadaniel
 component: Cloud Compute
-subcomponent: Other Providers
+subcomponent: Nutanix Provider
