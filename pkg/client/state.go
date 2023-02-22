@@ -5,7 +5,7 @@ import (
 	"math"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix/v3"
 )

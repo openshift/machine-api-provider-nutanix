@@ -71,7 +71,6 @@ var _ = BeforeSuite(func(ctx SpecContext) {
 	cfg, err = testEnv.Start()
 	Expect(err).ToNot(HaveOccurred())
 	Expect(cfg).ToNot(BeNil())
-
 }, NodeTimeout(60*time.Second))
 
 var _ = AfterSuite(func() {

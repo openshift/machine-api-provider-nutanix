@@ -21,6 +21,9 @@ func validateVMConfig(mscp *machineScope) field.ErrorList {
 	fldPath := field.NewPath("spec", "providerSpec", "value")
 	var errMsg string
 
+	// Will use the parameters in providerSpecValidated to create the VM
+	mscp.providerSpecValidated = mscp.providerSpec.DeepCopy()
+
 	// verify the cluster configuration
 	if fldErr := validateClusterConfig(mscp, fldPath); fldErr != nil {
 		errList = append(errList, fldErr)
@@ -34,44 +37,68 @@ func validateVMConfig(mscp *machineScope) field.ErrorList {
 	// verify the subnets configuration
 	// Currently we only allow and support one subnet per VM
 	// We may extend to allow and support more than one subnets per VM, in the future release
-	if len(mscp.providerSpec.Subnets) == 0 {
+	if len(mscp.providerSpecValidated.Subnets) == 0 {
 		errList = append(errList, field.Required(fldPath.Child("subnets"), "Missing subnets"))
 
-	} else if len(mscp.providerSpec.Subnets) > 1 {
+	} else if len(mscp.providerSpecValidated.Subnets) > 1 {
 		errMsg = "Currently we only allow and support one subnet per VM, but more than one subnets are configured."
-		errList = append(errList, field.Invalid(fldPath.Child("subnets"), len(mscp.providerSpec.Subnets), errMsg))
+		errList = append(errList, field.Invalid(fldPath.Child("subnets"), len(mscp.providerSpecValidated.Subnets), errMsg))
 
 	} else {
-		subnet := &mscp.providerSpec.Subnets[0]
+		subnet := &mscp.providerSpecValidated.Subnets[0]
 		if fldErr := validateSubnetConfig(mscp, subnet, fldPath); fldErr != nil {
 			errList = append(errList, fldErr)
 		}
 	}
 
 	// verify the vcpusPerSocket configuration
-	if mscp.providerSpec.VCPUsPerSocket < 1 {
+	if mscp.providerSpecValidated.VCPUsPerSocket < 1 {
 		errMsg = "The minimum number of vCPUs per socket of the VM is 1."
-		errList = append(errList, field.Invalid(fldPath.Child("vcpusPerSocket"), mscp.providerSpec.VCPUsPerSocket, errMsg))
+		errList = append(errList, field.Invalid(fldPath.Child("vcpusPerSocket"), mscp.providerSpecValidated.VCPUsPerSocket, errMsg))
 	}
 
 	// verify the vcpuSockets configuration
-	if mscp.providerSpec.VCPUSockets < 1 {
+	if mscp.providerSpecValidated.VCPUSockets < 1 {
 		errMsg = "The minimum vCPU sockets of the VM is 1."
-		errList = append(errList, field.Invalid(fldPath.Child("vcpuSockets"), mscp.providerSpec.VCPUSockets, errMsg))
+		errList = append(errList, field.Invalid(fldPath.Child("vcpuSockets"), mscp.providerSpecValidated.VCPUSockets, errMsg))
 	}
 
 	// verify the memorySize configuration
 	// The minimum memorySize is 2Gi bytes
-	memSizeMib := GetMibValueOfQuantity(mscp.providerSpec.MemorySize)
+	memSizeMib := GetMibValueOfQuantity(mscp.providerSpecValidated.MemorySize)
 	if memSizeMib < 2*1024 {
 		errList = append(errList, field.Invalid(fldPath.Child("memorySize"), fmt.Sprintf("%vMib", memSizeMib), "The minimum memorySize is 2Gi bytes"))
 	}
 
 	// verify the systemDiskSize configuration
 	// The minimum systemDiskSize is 20Gi bytes
-	diskSizeMib := GetMibValueOfQuantity(mscp.providerSpec.SystemDiskSize)
+	diskSizeMib := GetMibValueOfQuantity(mscp.providerSpecValidated.SystemDiskSize)
 	if diskSizeMib < 20*1024 {
 		errList = append(errList, field.Invalid(fldPath.Child("systemDiskSize"), fmt.Sprintf("%vGib", diskSizeMib/1024), "The minimum systemDiskSize is 20Gi bytes"))
+	}
+
+	// verify the bootType configurations
+	// Type bootType field is optional, and valid values include: "", Legacy, UEFI, SecureBoot
+	switch mscp.providerSpecValidated.BootType {
+	case "", machinev1.NutanixLegacyBoot, machinev1.NutanixUEFIBoot, machinev1.NutanixSecureBoot:
+		// valid bootType
+	default:
+		errMsg = fmt.Sprintf("Invalid bootType, the valid bootType values are: \"\", %q, %q, %q.",
+			machinev1.NutanixLegacyBoot, machinev1.NutanixUEFIBoot, machinev1.NutanixSecureBoot)
+		errList = append(errList, field.Invalid(fldPath.Child("bootType"), mscp.providerSpecValidated.BootType, errMsg))
+	}
+
+	// verify the project configuration
+	if fldErr := validateProjectConfig(mscp, fldPath); fldErr != nil {
+		errList = append(errList, fldErr)
+	}
+
+	// verify the categories configuration
+	if len(mscp.providerSpecValidated.Categories) > 0 {
+		fldErrs := validateCategoriesConfig(mscp, fldPath)
+		for _, fldErr := range fldErrs {
+			errList = append(errList, fldErr)
+		}
 	}
 
 	return errList
@@ -81,26 +108,26 @@ func validateClusterConfig(mscp *machineScope, fldPath *field.Path) *field.Error
 	var err error
 	var errMsg string
 
-	switch mscp.providerSpec.Cluster.Type {
+	switch mscp.providerSpecValidated.Cluster.Type {
 	case machinev1.NutanixIdentifierName:
-		if mscp.providerSpec.Cluster.Name == nil || *mscp.providerSpec.Cluster.Name == "" {
+		if mscp.providerSpecValidated.Cluster.Name == nil || *mscp.providerSpecValidated.Cluster.Name == "" {
 			return field.Required(fldPath.Child("cluster", "name"), "Missing cluster name")
 		} else {
-			clusterName := *mscp.providerSpec.Cluster.Name
+			clusterName := *mscp.providerSpecValidated.Cluster.Name
 			clusterRefUuidPtr, err := findClusterUuidByName(mscp.nutanixClient, clusterName)
 			if err != nil {
 				errMsg = fmt.Sprintf("Failed to find cluster with name %q. error: %v", clusterName, err)
 				return field.Invalid(fldPath.Child("cluster", "name"), clusterName, errMsg)
 			} else {
-				mscp.providerSpec.Cluster.Type = machinev1.NutanixIdentifierUUID
-				mscp.providerSpec.Cluster.UUID = clusterRefUuidPtr
+				mscp.providerSpecValidated.Cluster.Type = machinev1.NutanixIdentifierUUID
+				mscp.providerSpecValidated.Cluster.UUID = clusterRefUuidPtr
 			}
 		}
 	case machinev1.NutanixIdentifierUUID:
-		if mscp.providerSpec.Cluster.UUID == nil || *mscp.providerSpec.Cluster.UUID == "" {
+		if mscp.providerSpecValidated.Cluster.UUID == nil || *mscp.providerSpecValidated.Cluster.UUID == "" {
 			return field.Required(fldPath.Child("cluster", "uuid"), "Missing cluster uuid")
 		} else {
-			clusterUUID := *mscp.providerSpec.Cluster.UUID
+			clusterUUID := *mscp.providerSpecValidated.Cluster.UUID
 			if _, err = mscp.nutanixClient.V3.GetCluster(clusterUUID); err != nil {
 				errMsg = fmt.Sprintf("Failed to find cluster with uuid %v. error: %v", clusterUUID, err)
 				return field.Invalid(fldPath.Child("cluster", "uuid"), clusterUUID, errMsg)
@@ -108,7 +135,7 @@ func validateClusterConfig(mscp *machineScope, fldPath *field.Path) *field.Error
 		}
 	default:
 		errMsg = fmt.Sprintf("Invalid cluster identifier type, valid types are: %q, %q.", machinev1.NutanixIdentifierName, machinev1.NutanixIdentifierUUID)
-		return field.Invalid(fldPath.Child("cluster", "type"), mscp.providerSpec.Cluster.Type, errMsg)
+		return field.Invalid(fldPath.Child("cluster", "type"), mscp.providerSpecValidated.Cluster.Type, errMsg)
 	}
 
 	return nil
@@ -118,26 +145,26 @@ func validateImageConfig(mscp *machineScope, fldPath *field.Path) *field.Error {
 	var err error
 	var errMsg string
 
-	switch mscp.providerSpec.Image.Type {
+	switch mscp.providerSpecValidated.Image.Type {
 	case machinev1.NutanixIdentifierName:
-		if mscp.providerSpec.Image.Name == nil || *mscp.providerSpec.Image.Name == "" {
+		if mscp.providerSpecValidated.Image.Name == nil || *mscp.providerSpecValidated.Image.Name == "" {
 			return field.Required(fldPath.Child("image", "name"), "Missing image name")
 		} else {
-			imageName := *mscp.providerSpec.Image.Name
+			imageName := *mscp.providerSpecValidated.Image.Name
 			imageRefUuidPtr, err := findImageUuidByName(mscp.nutanixClient, imageName)
 			if err != nil {
 				errMsg = fmt.Sprintf("Failed to find image with name %q. error: %v", imageName, err)
 				return field.Invalid(fldPath.Child("image", "name"), imageName, errMsg)
 			} else {
-				mscp.providerSpec.Image.Type = machinev1.NutanixIdentifierUUID
-				mscp.providerSpec.Image.UUID = imageRefUuidPtr
+				mscp.providerSpecValidated.Image.Type = machinev1.NutanixIdentifierUUID
+				mscp.providerSpecValidated.Image.UUID = imageRefUuidPtr
 			}
 		}
 	case machinev1.NutanixIdentifierUUID:
-		if mscp.providerSpec.Image.UUID == nil || *mscp.providerSpec.Image.UUID == "" {
+		if mscp.providerSpecValidated.Image.UUID == nil || *mscp.providerSpecValidated.Image.UUID == "" {
 			return field.Required(fldPath.Child("image", "uuid"), "Missing image uuid")
 		} else {
-			imageUUID := *mscp.providerSpec.Image.UUID
+			imageUUID := *mscp.providerSpecValidated.Image.UUID
 			if _, err = mscp.nutanixClient.V3.GetImage(imageUUID); err != nil {
 				errMsg = fmt.Sprintf("Failed to find image with uuid %v. error: %v", imageUUID, err)
 				return field.Invalid(fldPath.Child("image", "uuid"), imageUUID, errMsg)
@@ -145,7 +172,7 @@ func validateImageConfig(mscp *machineScope, fldPath *field.Path) *field.Error {
 		}
 	default:
 		errMsg = fmt.Sprintf("Invalid image identifier type, valid types are: %q, %q.", machinev1.NutanixIdentifierName, machinev1.NutanixIdentifierUUID)
-		return field.Invalid(fldPath.Child("image", "type"), mscp.providerSpec.Image.Type, errMsg)
+		return field.Invalid(fldPath.Child("image", "type"), mscp.providerSpecValidated.Image.Type, errMsg)
 	}
 
 	return nil
@@ -186,6 +213,58 @@ func validateSubnetConfig(mscp *machineScope, subnet *machinev1.NutanixResourceI
 	return nil
 }
 
+func validateProjectConfig(mscp *machineScope, fldPath *field.Path) *field.Error {
+	var err error
+	var errMsg string
+
+	switch mscp.providerSpecValidated.Project.Type {
+	case "":
+		// ignore if not configured
+		return nil
+	case machinev1.NutanixIdentifierName:
+		if mscp.providerSpecValidated.Project.Name == nil || *mscp.providerSpecValidated.Project.Name == "" {
+			return field.Required(fldPath.Child("project", "name"), "Missing projct name")
+		} else {
+			projectName := *mscp.providerSpecValidated.Project.Name
+			projectRefUuidPtr, err := findProjectUuidByName(mscp.nutanixClient, projectName)
+			if err != nil {
+				errMsg = fmt.Sprintf("Failed to find project with name %q. error: %v", projectName, err)
+				return field.Invalid(fldPath.Child("project", "name"), projectName, errMsg)
+			} else {
+				mscp.providerSpecValidated.Project.Type = machinev1.NutanixIdentifierUUID
+				mscp.providerSpecValidated.Project.UUID = projectRefUuidPtr
+			}
+		}
+	case machinev1.NutanixIdentifierUUID:
+		if mscp.providerSpecValidated.Project.UUID == nil || *mscp.providerSpecValidated.Project.UUID == "" {
+			return field.Required(fldPath.Child("project", "uuid"), "Missing project uuid")
+		} else {
+			projectUUID := *mscp.providerSpecValidated.Project.UUID
+			if _, err = mscp.nutanixClient.V3.GetProject(projectUUID); err != nil {
+				errMsg = fmt.Sprintf("Failed to find project with uuid %v. error: %v", projectUUID, err)
+				return field.Invalid(fldPath.Child("project", "uuid"), projectUUID, errMsg)
+			}
+		}
+	default:
+		errMsg = fmt.Sprintf("Invalid project identifier type, valid types are: %q, %q.", machinev1.NutanixIdentifierName, machinev1.NutanixIdentifierUUID)
+		return field.Invalid(fldPath.Child("project", "type"), mscp.providerSpecValidated.Project.Type, errMsg)
+	}
+
+	return nil
+}
+
+func validateCategoriesConfig(mscp *machineScope, fldPath *field.Path) (fldErrs []*field.Error) {
+	for _, category := range mscp.providerSpecValidated.Categories {
+		_, err := mscp.nutanixClient.V3.GetCategoryValue(category.Key, category.Value)
+		if err != nil {
+			errMsg := fmt.Sprintf("Failed to find the category with key %q and value %q. error: %v", category.Key, category.Value, err)
+			fldErrs = append(fldErrs, field.Invalid(fldPath.Child("categories"), category, errMsg))
+		}
+	}
+
+	return fldErrs
+}
+
 // CreateVM creates a VM and is invoked by the NutanixMachineReconciler
 func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentResponse, error) {
 
@@ -209,12 +288,12 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 		userdataEncoded := base64.StdEncoding.EncodeToString(userData)
 
 		// Create the VM
-		klog.V(5).Infof("To create VM with name %q, and providerSpec: %+v", vmName, *mscp.providerSpec)
+		klog.V(5).Infof("To create VM with name %q, and providerSpec: %+v", vmName, *mscp.providerSpecValidated)
 		vmInput := nutanixClientV3.VMIntentInput{}
 		vmSpec := nutanixClientV3.VM{Name: utils.StringPtr(vmName)}
 
 		nicList := []*nutanixClientV3.VMNic{}
-		for _, subnet := range mscp.providerSpec.Subnets {
+		for _, subnet := range mscp.providerSpecValidated.Subnets {
 			vmNic := &nutanixClientV3.VMNic{
 				SubnetReference: &nutanixClientV3.Reference{
 					Kind: utils.StringPtr("subnet"),
@@ -228,9 +307,9 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 		diskList = append(diskList, &nutanixClientV3.VMDisk{
 			DataSourceReference: &nutanixClientV3.Reference{
 				Kind: utils.StringPtr("image"),
-				UUID: mscp.providerSpec.Image.UUID,
+				UUID: mscp.providerSpecValidated.Image.UUID,
 			},
-			DiskSizeMib: utils.Int64Ptr(GetMibValueOfQuantity(mscp.providerSpec.SystemDiskSize)),
+			DiskSizeMib: utils.Int64Ptr(GetMibValueOfQuantity(mscp.providerSpecValidated.SystemDiskSize)),
 		})
 
 		vmMetadata := nutanixClientV3.Metadata{
@@ -238,20 +317,27 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 			SpecVersion: utils.Int64Ptr(1),
 		}
 
-		// Add the category for installer clueanup the VM at cluster torn-down time
-		// if the category exists in PC
-		if err := addCategory(mscp, &vmMetadata); err != nil {
-			klog.Warningf("Failed to add category to the vm %q. %v", vmName, err)
+		// Add the projectReference if project is configured
+		if mscp.providerSpecValidated.Project.Type == machinev1.NutanixIdentifierUUID {
+			vmMetadata.ProjectReference = &nutanixClientV3.Reference{
+				Kind: utils.StringPtr("project"),
+				UUID: mscp.providerSpecValidated.Project.UUID,
+			}
+		}
+
+		// Add the categories
+		if err := addCategories(mscp, &vmMetadata); err != nil {
+			klog.Warningf("Failed to add categories to the vm %q. %v", vmName, err)
 		} else {
-			klog.Infof("%s: added the category to the vm %q: %v", mscp.machine.Name, vmName, vmMetadata.Categories)
+			klog.Infof("%s: added the categories to the vm %q: %v", mscp.machine.Name, vmName, vmMetadata.Categories)
 		}
 
 		vmSpec.Resources = &nutanixClientV3.VMResources{
 			PowerState:            utils.StringPtr("ON"),
 			HardwareClockTimezone: utils.StringPtr("UTC"),
-			NumVcpusPerSocket:     utils.Int64Ptr(int64(mscp.providerSpec.VCPUsPerSocket)),
-			NumSockets:            utils.Int64Ptr(int64(mscp.providerSpec.VCPUSockets)),
-			MemorySizeMib:         utils.Int64Ptr(GetMibValueOfQuantity(mscp.providerSpec.MemorySize)),
+			NumVcpusPerSocket:     utils.Int64Ptr(int64(mscp.providerSpecValidated.VCPUsPerSocket)),
+			NumSockets:            utils.Int64Ptr(int64(mscp.providerSpecValidated.VCPUSockets)),
+			MemorySizeMib:         utils.Int64Ptr(GetMibValueOfQuantity(mscp.providerSpecValidated.MemorySize)),
 			NicList:               nicList,
 			DiskList:              diskList,
 			GuestCustomization: &nutanixClientV3.GuestCustomization{
@@ -262,7 +348,30 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 		// Set cluster/PE reference
 		vmSpec.ClusterReference = &nutanixClientV3.Reference{
 			Kind: utils.StringPtr("cluster"),
-			UUID: mscp.providerSpec.Cluster.UUID,
+			UUID: mscp.providerSpecValidated.Cluster.UUID,
+		}
+
+		// Set boot_type if configured in the machine's providerSpec
+		switch mscp.providerSpecValidated.BootType {
+		case machinev1.NutanixUEFIBoot:
+			vmSpec.Resources.BootConfig = &nutanixClientV3.VMBootConfig{
+				BootType: utils.StringPtr("UEFI"),
+			}
+		case machinev1.NutanixSecureBoot:
+			vmSpec.Resources.BootConfig = &nutanixClientV3.VMBootConfig{
+				BootType: utils.StringPtr("SECURE_BOOT"),
+			}
+		case machinev1.NutanixLegacyBoot:
+			bootDeviceOrderList := make([]*string, 0)
+			bootDeviceOrderList = append(bootDeviceOrderList, utils.StringPtr("CDROM"))
+			bootDeviceOrderList = append(bootDeviceOrderList, utils.StringPtr("DISK"))
+			bootDeviceOrderList = append(bootDeviceOrderList, utils.StringPtr("NETWORK"))
+			vmSpec.Resources.BootConfig = &nutanixClientV3.VMBootConfig{
+				BootType:            utils.StringPtr("LEGACY"),
+				BootDeviceOrderList: bootDeviceOrderList,
+			}
+		default:
+			// The vm uses the default boot type
 		}
 
 		vmInput.Spec = &vmSpec
@@ -287,7 +396,7 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 	}
 
 	vm, err = findVMByUUID(mscp.nutanixClient, vmUuid)
-	for err != nil {
+	if err != nil {
 		klog.Errorf("Failed to find the vm with UUID %s. %v", vmUuid, err)
 		return nil, err
 	}
@@ -380,7 +489,9 @@ func findClusterUuidByName(ntnxclient *nutanixClientV3.Client, clusterName strin
 	}
 
 	if len(res.Entities) > 1 {
-		klog.Warningf("Found more than one (%v) clusters with name %q.", len(res.Entities), clusterName)
+		err = fmt.Errorf("Found more than one (%v) clusters with name %q.", len(res.Entities), clusterName)
+		klog.Errorf(err.Error())
+		return nil, err
 	}
 
 	return res.Entities[0].Metadata.UUID, nil
@@ -401,7 +512,9 @@ func findImageUuidByName(ntnxclient *nutanixClientV3.Client, imageName string) (
 	}
 
 	if len(res.Entities) > 1 {
-		klog.Warningf("Found more than one (%v) images with name %q.", len(res.Entities), imageName)
+		err = fmt.Errorf("Found more than one (%v) images with name %q.", len(res.Entities), imageName)
+		klog.Errorf(err.Error())
+		return nil, err
 	}
 
 	return res.Entities[0].Metadata.UUID, nil
@@ -422,7 +535,31 @@ func findSubnetUuidByName(ntnxclient *nutanixClientV3.Client, subnetName string)
 	}
 
 	if len(res.Entities) > 1 {
-		klog.Warningf("Found more than one (%v) subnets with name %q.", len(res.Entities), subnetName)
+		err = fmt.Errorf("Found more than one (%v) subnets with name %q.", len(res.Entities), subnetName)
+		klog.Errorf(err.Error())
+		return nil, err
+	}
+
+	return res.Entities[0].Metadata.UUID, nil
+}
+
+// findProjectUuidByName retrieves the project uuid by the given project name
+func findProjectUuidByName(ntnxclient *nutanixClientV3.Client, projectName string) (*string, error) {
+	klog.Infof("Checking if project with name %q exists.", projectName)
+
+	res, err := ntnxclient.V3.ListProject(&nutanixClientV3.DSMetadata{
+		Filter: utils.StringPtr(fmt.Sprintf("name==%s", projectName)),
+	})
+	if err != nil || len(res.Entities) == 0 {
+		e1 := fmt.Errorf("Failed to find project by name %q. error: %w", projectName, err)
+		klog.Errorf(e1.Error())
+		return nil, e1
+	}
+
+	if len(res.Entities) > 1 {
+		err = fmt.Errorf("Found more than one (%v) projects with name %q.", len(res.Entities), projectName)
+		klog.Errorf(err.Error())
+		return nil, err
 	}
 
 	return res.Entities[0].Metadata.UUID, nil
