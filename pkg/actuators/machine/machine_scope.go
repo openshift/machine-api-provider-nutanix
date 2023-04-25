@@ -208,6 +208,12 @@ func (s *machineScope) getUserData() ([]byte, error) {
 		return nil, fmt.Errorf("The userData secret %s missing %s key", objKey, userDataSecretKey)
 	}
 
+	// WMCO already takes case of setting the hostname to the same as the Machine name. So just return userData.
+	if s.machine.Labels["machine.openshift.io/os-id"] == "Windows" {
+		klog.V(3).Infof("%s: The windows-user-data: %s", s.machine.Name, string(userData))
+		return userData, nil
+	}
+
 	// Add the /etc/hostname file with the content of the Machine name, to the ignition userData.
 	ignConfig := &igntypes.Config{}
 	err := json.Unmarshal(userData, ignConfig)
