@@ -4,6 +4,7 @@ go 1.19
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
+	github.com/coreos/ignition/v2 v2.14.0
 	github.com/go-logr/logr v1.2.3
 	github.com/golang/mock v1.6.0
 	github.com/nutanix-cloud-native/prism-go-client v0.2.0
@@ -11,6 +12,7 @@ require (
 	github.com/onsi/gomega v1.26.0
 	github.com/openshift/api v0.0.0-20230210183623-c7a709d557d0
 	github.com/openshift/machine-api-operator v0.2.1-0.20220930152820-30825f121cc5
+	github.com/vincent-petithory/dataurl v1.0.0
 
 	// kube 1.26
 	k8s.io/api v0.26.1
@@ -29,6 +31,9 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
+	github.com/coreos/go-semver v0.3.0 // indirect
+	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
+	github.com/coreos/vcontext v0.0.0-20211021162308-f1dbbca7bef4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
@@ -80,7 +85,7 @@ require (
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/russross/blackfriday v1.5.2 // indirect
 	github.com/spf13/cobra v1.6.1 // indirect
-	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/spf13/pflag v1.0.6-0.20210604193023-d5e0c0615ace // indirect
 	github.com/xlab/treeprint v1.1.0 // indirect
 	go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5 // indirect
 	golang.org/x/mod v0.8.0 // indirect

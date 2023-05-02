@@ -2,14 +2,18 @@ package machine
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 
+	ignutil "github.com/coreos/ignition/v2/config/util"
+	igntypes "github.com/coreos/ignition/v2/config/v3_2/types"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	machineapierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	clientpkg "github.com/openshift/machine-api-provider-nutanix/pkg/client"
+	dataurl "github.com/vincent-petithory/dataurl"
 
 	nutanixClient "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix"
 	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix/v3"
@@ -204,7 +208,37 @@ func (s *machineScope) getUserData() ([]byte, error) {
 		return nil, fmt.Errorf("The userData secret %s missing %s key", objKey, userDataSecretKey)
 	}
 
-	return userData, nil
+	// Add the /etc/hostname file with the content of the Machine name, to the ignition userData.
+	ignConfig := &igntypes.Config{}
+	err := json.Unmarshal(userData, ignConfig)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to unmarshal userData to IgnitionConfig. %w", err)
+	}
+
+	hostnameFile := igntypes.File{
+		Node: igntypes.Node{
+			Path:      "/etc/hostname",
+			Overwrite: ignutil.BoolToPtr(true),
+		},
+		FileEmbedded1: igntypes.FileEmbedded1{
+			Mode: ignutil.IntToPtr(420),
+			Contents: igntypes.Resource{
+				Source: ignutil.StrToPtr(dataurl.EncodeBytes([]byte(s.machine.Name))),
+			},
+		},
+	}
+	if ignConfig.Storage.Files == nil {
+		ignConfig.Storage.Files = make([]igntypes.File, 0)
+	}
+	ignConfig.Storage.Files = append(ignConfig.Storage.Files, hostnameFile)
+
+	ignData, err := json.Marshal(ignConfig)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to marshal ignition data. %w", err)
+	}
+	klog.V(3).Infof("%s: The ignition data: %s", s.machine.Name, string(ignData))
+
+	return ignData, nil
 }
 
 func (s *machineScope) setProviderStatus(vm *nutanixClientV3.VMIntentResponse, condition metav1.Condition) error {

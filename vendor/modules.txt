@@ -26,6 +26,23 @@ github.com/chai2010/gettext-go
 github.com/chai2010/gettext-go/mo
 github.com/chai2010/gettext-go/plural
 github.com/chai2010/gettext-go/po
+# github.com/coreos/go-semver v0.3.0
+## explicit
+github.com/coreos/go-semver/semver
+# github.com/coreos/go-systemd/v22 v22.3.2
+## explicit; go 1.12
+github.com/coreos/go-systemd/v22/unit
+# github.com/coreos/ignition/v2 v2.14.0
+## explicit; go 1.15
+github.com/coreos/ignition/v2/config/shared/errors
+github.com/coreos/ignition/v2/config/shared/validations
+github.com/coreos/ignition/v2/config/util
+github.com/coreos/ignition/v2/config/v3_2/types
+# github.com/coreos/vcontext v0.0.0-20211021162308-f1dbbca7bef4
+## explicit; go 1.15
+github.com/coreos/vcontext/path
+github.com/coreos/vcontext/report
+github.com/coreos/vcontext/tree
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
@@ -269,9 +286,12 @@ github.com/russross/blackfriday
 # github.com/spf13/cobra v1.6.1
 ## explicit; go 1.15
 github.com/spf13/cobra
-# github.com/spf13/pflag v1.0.5
+# github.com/spf13/pflag v1.0.6-0.20210604193023-d5e0c0615ace
 ## explicit; go 1.12
 github.com/spf13/pflag
+# github.com/vincent-petithory/dataurl v1.0.0
+## explicit
+github.com/vincent-petithory/dataurl
 # github.com/xlab/treeprint v1.1.0
 ## explicit; go 1.13
 github.com/xlab/treeprint
