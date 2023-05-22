@@ -27,7 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -195,9 +194,9 @@ func main() {
 // namespace.
 func newConfigManagedClient(mgr manager.Manager) (runtimeclient.Client, manager.Runnable, error) {
 	cacheOpts := cache.Options{
-		Scheme:    mgr.GetScheme(),
-		Mapper:    mgr.GetRESTMapper(),
-		Namespace: "openshift-config-managed",
+		Scheme:     mgr.GetScheme(),
+		Mapper:     mgr.GetRESTMapper(),
+		Namespaces: []string{"openshift-config-managed"},
 	}
 	cache, err := cache.New(mgr.GetConfig(), cacheOpts)
 	if err != nil {
@@ -207,9 +206,12 @@ func newConfigManagedClient(mgr manager.Manager) (runtimeclient.Client, manager.
 	clientOpts := runtimeclient.Options{
 		Scheme: mgr.GetScheme(),
 		Mapper: mgr.GetRESTMapper(),
+		Cache: &runtimeclient.CacheOptions{
+			Reader: cache,
+		},
 	}
 
-	cachedClient, err := cluster.DefaultNewClient(cache, config.GetConfigOrDie(), clientOpts)
+	cachedClient, err := runtimeclient.New(config.GetConfigOrDie(), clientOpts)
 	if err != nil {
 		return nil, nil, err
 	}
