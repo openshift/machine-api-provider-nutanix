@@ -272,6 +272,7 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 	var vm *nutanixClientV3.VMIntentResponse
 	var vmUuid string
 	vmName := mscp.machine.Name
+	startTime := time.Now()
 
 	// Check if the VM already exists
 	if mscp.providerStatus.VmUUID != nil {
@@ -390,9 +391,10 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 
 	//Let's wait to vm's state to become "COMPLETE"
 	err = clientpkg.WaitForGetVMComplete(mscp.nutanixClient, vmUuid)
+	timeElapsed := time.Now().Sub(startTime).String()
 	if err != nil {
-		klog.Errorf("Failed to get the vm with UUID %s. error: %v", vmUuid, err)
-		return nil, fmt.Errorf("Error retriving the created vm %q", vmName)
+		klog.Errorf("Failed to get the vm %q with UUID %s (time spent: %s). error: %v", vmName, vmUuid, timeElapsed, err)
+		return nil, fmt.Errorf("Error retriving vm %q (uuid: %s). error: %w", vmName, vmUuid, err)
 	}
 
 	vm, err = findVMByUUID(mscp.nutanixClient, vmUuid)
@@ -400,7 +402,7 @@ func createVM(mscp *machineScope, userData []byte) (*nutanixClientV3.VMIntentRes
 		klog.Errorf("Failed to find the vm with UUID %s. %v", vmUuid, err)
 		return nil, err
 	}
-	klog.Infof("The vm %q is ready. vmUUID: %s, vmState: %s", vmName, vmUuid, *vm.Status.State)
+	klog.Infof("The vm %q is ready. vmUUID: %s, vmState: %s, time spent: %s", vmName, vmUuid, *vm.Status.State, timeElapsed)
 
 	return vm, nil
 }
