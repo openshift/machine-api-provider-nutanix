@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -41,7 +42,7 @@ func WaitForGetSubnetDelete(conn *nutanixClientV3.Client, imageUUID string) erro
 }
 
 func waitForState(errCh chan<- error, target string, refresh stateRefreshFunc) error {
-	err := Retry(2, 5, 0, func(_ uint) (bool, error) {
+	err := Retry(2, 5, 50, func(_ uint) (bool, error) {
 		state, err := refresh()
 		if err != nil {
 			return false, err
@@ -72,7 +73,7 @@ func waitUntilVMStateFunc(conn *nutanixClientV3.Client, uuid string) stateRefres
 		klog.V(5).Infof("Read Response %v", *resp.Status.State)
 
 		if *resp.Status.State == "ERROR" {
-			return "error", nil
+			return "error", fmt.Errorf(GetMessageListString(resp.Status.MessageList))
 		}
 
 		if *resp.Status.State != "COMPLETE" {
@@ -101,7 +102,7 @@ func waitUntilSubnetStateFunc(conn *nutanixClientV3.Client, uuid string) stateRe
 		klog.V(5).Infof("Read Response %v", *resp.Status.State)
 
 		if *resp.Status.State == "ERROR" {
-			return "error", nil
+			return "error", fmt.Errorf(GetMessageListString(resp.Status.MessageList))
 		}
 
 		if *resp.Status.State != "COMPLETE" {
@@ -155,4 +156,18 @@ func Retry(initialInterval float64, maxInterval float64, numTries uint, function
 		return fmt.Errorf("Function never succeeded in Retry")
 	}
 	return nil
+}
+
+// GetMessageListString Returns a string representation of the given MessageResource list.
+// If the list is empty, returns an empty string.
+func GetMessageListString(msgList []*nutanixClientV3.MessageResource) string {
+	if len(msgList) == 0 {
+		return ""
+	}
+
+	var errMsgs []string
+	for _, msg := range msgList {
+		errMsgs = append(errMsgs, fmt.Sprintf("{\"message\": %q, \"reason\": %q}", *msg.Message, *msg.Reason))
+	}
+	return fmt.Sprintf("[%s]", strings.Join(errMsgs, ", "))
 }
