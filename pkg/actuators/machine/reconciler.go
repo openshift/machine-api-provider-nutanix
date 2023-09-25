@@ -12,6 +12,7 @@ import (
 
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/openshift/machine-api-operator/pkg/metrics"
+	clientpkg "github.com/openshift/machine-api-provider-nutanix/pkg/client"
 )
 
 const (
@@ -116,6 +117,20 @@ func (r *Reconciler) update() error {
 			r.machineScope.setProviderStatus(nil, conditionFailed(machineUpdate, err.Error()))
 			return err
 		}
+	}
+
+	// The found VM is in ERROR state
+	if *vm.Status.State == "ERROR" {
+		errMsg := clientpkg.GetMessageListString(vm.Status.MessageList)
+		err = fmt.Errorf("The retrieved VM %q has ERROR state. error: %s", *vm.Spec.Name, errMsg)
+		klog.Error(err)
+		metrics.RegisterFailedInstanceUpdate(&metrics.MachineLabels{
+			Name:      r.machine.Name,
+			Namespace: r.machine.Namespace,
+			Reason:    "The VM is in ERROR state",
+		})
+		r.machineScope.setProviderStatus(nil, conditionFailed(machineUpdate, err.Error()))
+		return err
 	}
 
 	if err = r.updateMachineWithVMState(vm); err != nil {
