@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
 const (
@@ -48,7 +49,7 @@ func TestMain(m *testing.M) {
 
 	mgr, err := manager.New(cfg, manager.Options{
 		Scheme:             scheme.Scheme,
-		MetricsBindAddress: "0",
+		Metrics: metricsserver.Options{BindAddress: "0"},
 	})
 	if err != nil {
 		log.Fatal(err)
