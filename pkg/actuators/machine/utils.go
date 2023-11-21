@@ -389,15 +389,12 @@ func stringPointerDeref(stringPointer *string) string {
 	return ""
 }
 
-// StringPtr returns a pointer to the string value passed in.
-func stringPointer(str string) *string {
-	if len(str) == 0 {
-		return nil
-	}
-	return &str
-}
-
 // GetMibValueOfQuantity returns the given quantity value in Mib
 func GetMibValueOfQuantity(quantity resource.Quantity) int64 {
 	return quantity.Value() / (1024 * 1024)
+}
+
+// Ptr takes a pointer to the passed object.
+func Ptr[T any](v T) *T {
+	return &v
 }

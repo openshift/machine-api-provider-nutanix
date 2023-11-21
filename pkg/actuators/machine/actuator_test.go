@@ -21,15 +21,6 @@ import (
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 )
 
-const (
-	// credentialsSecretName is the name of the secret holding the credentials for PC client
-	credentialsSecretName = "nutanix-credentials"
-
-	userDataSecretName = "nutanix-userdata"
-
-	credentialsData = `[{"type":"basic_auth","data":{"prismCentral":{"username":"pc_user","password":"pc_password"},"prismElements":[{"name":"pe_name","username":"pe_user","password":"pe_password"}]}}]`
-)
-
 func init() {
 	// Add types to scheme
 	machinev1beta1.AddToScheme(scheme.Scheme)
@@ -42,48 +33,21 @@ func TestMachineEvents(t *testing.T) {
 	g := NewWithT(t)
 	ctx := context.Background()
 
-	// Create the Infrastructure CR
-	infra := &configv1.Infrastructure{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: globalInfrastuctureName,
-		},
-		Spec: configv1.InfrastructureSpec{
-			CloudConfig: configv1.ConfigMapFileReference{},
-			PlatformSpec: configv1.PlatformSpec{
-				Type: configv1.NutanixPlatformType,
-				Nutanix: &configv1.NutanixPlatformSpec{
-					PrismCentral: configv1.NutanixPrismEndpoint{Address: "10.40.142.15", Port: 9440},
-					PrismElements: []configv1.NutanixPrismElementEndpoint{
-						{Name: "ganon", Endpoint: configv1.NutanixPrismEndpoint{Address: "10.40.231.131", Port: 9440}},
-					},
-				},
-			},
-		},
-	}
-
+	// Create the Infrastructure CR with the failureDomains configuration
+	infra := getInfrastructureObject(true)
 	g.Expect(k8sClient.Create(ctx, infra)).To(Succeed())
 	defer func() {
 		g.Expect(k8sClient.Delete(ctx, infra)).To(Succeed())
 	}()
-	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismCentral.Address).Should(Equal("10.40.142.15"))
+	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismCentral.Address).Should(Equal("10.40.42.15"))
 	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismCentral.Port).Should(Equal(int32(9440)))
 	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismElements).Should(HaveLen(1))
-	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismElements[0].Name).Should(Equal("ganon"))
-	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismElements[0].Endpoint.Address).Should(Equal("10.40.231.131"))
+	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismElements[0].Name).Should(Equal("test-pe"))
+	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismElements[0].Endpoint.Address).Should(Equal("10.40.131.30"))
 	g.Expect(infra.Spec.PlatformSpec.Nutanix.PrismElements[0].Endpoint.Port).Should(Equal(int32(9440)))
 
 	// Update the infrastructure status
-	infra.Status.InfrastructureName = "test-cluster-1"
-	infra.Status.Platform = configv1.NutanixPlatformType
-	infra.Status.ControlPlaneTopology = configv1.HighlyAvailableTopologyMode
-	infra.Status.InfrastructureTopology = configv1.SingleReplicaTopologyMode
-	infra.Status.PlatformStatus = &configv1.PlatformStatus{
-		Type: configv1.NutanixPlatformType,
-		Nutanix: &configv1.NutanixPlatformStatus{
-			APIServerInternalIP: "10.40.142.5",
-			IngressIP:           "10.40.142.6",
-		},
-	}
+	infra.Status = infrastructureStatus
 	g.Expect(k8sClient.Status().Update(ctx, infra)).To(Succeed())
 
 	testNsName := "test"
@@ -99,7 +63,7 @@ func TestMachineEvents(t *testing.T) {
 
 	credsSecret := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      credentialsSecretName,
+			Name:      defaultCredentialsSecretName,
 			Namespace: testNsName,
 		},
 		Data: map[string][]byte{
@@ -136,7 +100,7 @@ func TestMachineEvents(t *testing.T) {
 		{
 			name:         "Create machine failed on invalid machine scope",
 			machineName:  "test-machine",
-			providerSpec: validProviderSpec(),
+			providerSpec: getValidProviderSpec(""),
 			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
 				actuator.Create(nil, machine)
 			},
@@ -145,7 +109,7 @@ func TestMachineEvents(t *testing.T) {
 		{
 			name:         "Create machine failed on missing required label",
 			machineName:  "test-machine",
-			providerSpec: validProviderSpec(),
+			providerSpec: getValidProviderSpec(""),
 			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
 				machine.Labels[machinev1beta1.MachineClusterIDLabel] = ""
 				actuator.Create(ctx, machine)
@@ -156,7 +120,7 @@ func TestMachineEvents(t *testing.T) {
 			name:        "Create machine failed on configuration errors",
 			machineName: "test-machine",
 			providerSpec: func() *machinev1.NutanixMachineProviderConfig {
-				pspec := validProviderSpec()
+				pspec := getValidProviderSpec("")
 				pspec.Cluster.Type = "invalid-type"
 				pspec.Image.Name = nil
 				pspec.Subnets = append(pspec.Subnets,
@@ -183,9 +147,18 @@ func TestMachineEvents(t *testing.T) {
 			},
 		},
 		{
+			name:         "Create machine failed with invalid failure domain reference",
+			machineName:  "test-machine",
+			providerSpec: getValidProviderSpec("fd.invalid"),
+			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
+				actuator.Create(ctx, machine)
+			},
+			events: []string{"Could not find the failureDomain with name \"fd.invalid\" configured in the Infrastructure resource."},
+		},
+		{
 			name:         "Update machine failed on invalid machine scope",
 			machineName:  "test-machine",
-			providerSpec: validProviderSpec(),
+			providerSpec: getValidProviderSpec(""),
 			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
 				actuator.Update(nil, machine)
 			},
@@ -194,7 +167,7 @@ func TestMachineEvents(t *testing.T) {
 		{
 			name:         "Update failed on missing required label",
 			machineName:  "test-machine",
-			providerSpec: validProviderSpec(),
+			providerSpec: getValidProviderSpec(""),
 			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
 				machine.Labels[machinev1beta1.MachineClusterIDLabel] = ""
 				actuator.Update(ctx, machine)
@@ -204,7 +177,7 @@ func TestMachineEvents(t *testing.T) {
 		{
 			name:         "Delete machine event failed on invalid machine scope",
 			machineName:  "test-machine",
-			providerSpec: validProviderSpec(),
+			providerSpec: getValidProviderSpec(""),
 			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
 				actuator.Delete(nil, machine)
 			},
@@ -314,25 +287,5 @@ func TestMachineEvents(t *testing.T) {
 				gs.Expect(k8sClient.Delete(ctx, &eventList.Items[i])).To(Succeed())
 			}
 		})
-	}
-}
-
-func validProviderSpec() *machinev1.NutanixMachineProviderConfig {
-	return &machinev1.NutanixMachineProviderConfig{
-		Cluster: machinev1.NutanixResourceIdentifier{Type: "name", Name: utils.StringPtr("ganon")},
-		Image:   machinev1.NutanixResourceIdentifier{Type: "name", Name: utils.StringPtr("rhcos-4.10-nutanix")},
-		Subnets: []machinev1.NutanixResourceIdentifier{
-			{Type: "name", Name: utils.StringPtr("sherlock_net")},
-		},
-		VCPUsPerSocket: 2,
-		VCPUSockets:    1,
-		MemorySize:     resource.MustParse("4096Mi"),
-		SystemDiskSize: resource.MustParse("120Gi"),
-		CredentialsSecret: &corev1.LocalObjectReference{
-			Name: credentialsSecretName,
-		},
-		UserDataSecret: &corev1.LocalObjectReference{
-			Name: userDataSecretName,
-		},
 	}
 }

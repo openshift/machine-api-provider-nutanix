@@ -11,6 +11,7 @@ import (
 
 	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix/v3"
 	"github.com/nutanix-cloud-native/prism-go-client/pkg/utils"
+	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	clientpkg "github.com/openshift/machine-api-provider-nutanix/pkg/client"
 )
@@ -105,15 +106,15 @@ func validateVMConfig(mscp *machineScope) field.ErrorList {
 }
 
 func validateClusterConfig(mscp *machineScope, fldPath *field.Path) *field.Error {
-	var err error
 	var errMsg string
+	var clusterName string
 
 	switch mscp.providerSpecValidated.Cluster.Type {
 	case machinev1.NutanixIdentifierName:
 		if mscp.providerSpecValidated.Cluster.Name == nil || *mscp.providerSpecValidated.Cluster.Name == "" {
 			return field.Required(fldPath.Child("cluster", "name"), "Missing cluster name")
 		} else {
-			clusterName := *mscp.providerSpecValidated.Cluster.Name
+			clusterName = *mscp.providerSpecValidated.Cluster.Name
 			clusterRefUuidPtr, err := findClusterUuidByName(mscp.nutanixClient, clusterName)
 			if err != nil {
 				errMsg = fmt.Sprintf("Failed to find cluster with name %q. error: %v", clusterName, err)
@@ -128,14 +129,34 @@ func validateClusterConfig(mscp *machineScope, fldPath *field.Path) *field.Error
 			return field.Required(fldPath.Child("cluster", "uuid"), "Missing cluster uuid")
 		} else {
 			clusterUUID := *mscp.providerSpecValidated.Cluster.UUID
-			if _, err = mscp.nutanixClient.V3.GetCluster(clusterUUID); err != nil {
+			if res, err := mscp.nutanixClient.V3.GetCluster(clusterUUID); err != nil {
 				errMsg = fmt.Sprintf("Failed to find cluster with uuid %v. error: %v", clusterUUID, err)
 				return field.Invalid(fldPath.Child("cluster", "uuid"), clusterUUID, errMsg)
+			} else {
+				clusterName = *res.Spec.Name
 			}
 		}
 	default:
-		errMsg = fmt.Sprintf("Invalid cluster identifier type, valid types are: %q, %q.", machinev1.NutanixIdentifierName, machinev1.NutanixIdentifierUUID)
+		errMsg = fmt.Sprintf("Invalid cluster identifier type, valid types are: %q, %q.", configv1.NutanixIdentifierName, configv1.NutanixIdentifierUUID)
 		return field.Invalid(fldPath.Child("cluster", "type"), mscp.providerSpecValidated.Cluster.Type, errMsg)
+	}
+
+	// If the providerSpec configures the failureDomain reference, validate that the cluster
+	// configuration in both the providerSpec and the referenced failureDomain are consistent.
+	if mscp.failureDomain != nil {
+		fd := mscp.failureDomain
+		switch fd.Cluster.Type {
+		case configv1.NutanixIdentifierName:
+			if *fd.Cluster.Name != clusterName {
+				errMsg = fmt.Sprintf("The cluster configured in the providerSpec is not consistent with that configured in the failureDomain %q: %q", fd.Name, *fd.Cluster.Name)
+				return field.Invalid(fldPath.Child("cluster", "name"), clusterName, errMsg)
+			}
+		case configv1.NutanixIdentifierUUID:
+			if *fd.Cluster.UUID != *mscp.providerSpecValidated.Cluster.UUID {
+				errMsg = fmt.Sprintf("The cluster configured in the providerSpec is not consistent with that configured in the failureDomain %q: %q", fd.Name, *fd.Cluster.UUID)
+				return field.Invalid(fldPath.Child("cluster", "uuid"), *mscp.providerSpecValidated.Cluster.UUID, errMsg)
+			}
+		}
 	}
 
 	return nil
@@ -171,7 +192,7 @@ func validateImageConfig(mscp *machineScope, fldPath *field.Path) *field.Error {
 			}
 		}
 	default:
-		errMsg = fmt.Sprintf("Invalid image identifier type, valid types are: %q, %q.", machinev1.NutanixIdentifierName, machinev1.NutanixIdentifierUUID)
+		errMsg = fmt.Sprintf("Invalid image identifier type, valid types are: %q, %q.", configv1.NutanixIdentifierName, configv1.NutanixIdentifierUUID)
 		return field.Invalid(fldPath.Child("image", "type"), mscp.providerSpecValidated.Image.Type, errMsg)
 	}
 
@@ -179,18 +200,19 @@ func validateImageConfig(mscp *machineScope, fldPath *field.Path) *field.Error {
 }
 
 func validateSubnetConfig(mscp *machineScope, subnet *machinev1.NutanixResourceIdentifier, fldPath *field.Path) *field.Error {
-	var err error
 	var errMsg string
+	var subnetName string
 
 	switch subnet.Type {
 	case machinev1.NutanixIdentifierName:
 		if subnet.Name == nil || *subnet.Name == "" {
 			return field.Required(fldPath.Child("subnet", "name"), "Missing subnet name")
 		} else {
-			subnetRefUuidPtr, err := findSubnetUuidByName(mscp.nutanixClient, *subnet.Name)
+			subnetName = *subnet.Name
+			subnetRefUuidPtr, err := findSubnetUuidByName(mscp.nutanixClient, subnetName)
 			if err != nil {
-				errMsg = fmt.Sprintf("Failed to find subnet with name %q. error: %v", *subnet.Name, err)
-				return field.Invalid(fldPath.Child("subnet", "name"), *subnet.Name, errMsg)
+				errMsg = fmt.Sprintf("Failed to find subnet with name %q. error: %v", subnetName, err)
+				return field.Invalid(fldPath.Child("subnet", "name"), subnetName, errMsg)
 			} else {
 				subnet.Type = machinev1.NutanixIdentifierUUID
 				subnet.UUID = subnetRefUuidPtr
@@ -200,14 +222,40 @@ func validateSubnetConfig(mscp *machineScope, subnet *machinev1.NutanixResourceI
 		if subnet.UUID == nil || *subnet.UUID == "" {
 			return field.Required(fldPath.Child("subnet").Child("uuid"), "Missing subnet uuid")
 		} else {
-			if _, err = mscp.nutanixClient.V3.GetSubnet(*subnet.UUID); err != nil {
+			res, err := mscp.nutanixClient.V3.GetSubnet(*subnet.UUID)
+			if err != nil {
 				errMsg = fmt.Sprintf("Failed to find subnet with uuid %v. error: %v", *subnet.UUID, err)
 				return field.Invalid(fldPath.Child("subnet", "uuid"), *subnet.UUID, errMsg)
 			}
+			subnetName = *res.Spec.Name
 		}
 	default:
-		errMsg = fmt.Sprintf("Invalid subnet identifier type, valid types are: %q, %q.", machinev1.NutanixIdentifierName, machinev1.NutanixIdentifierUUID)
+		errMsg = fmt.Sprintf("Invalid subnet identifier type, valid types are: %q, %q.", configv1.NutanixIdentifierName, configv1.NutanixIdentifierUUID)
 		return field.Invalid(fldPath.Child("subnet", "type"), subnet.Type, errMsg)
+	}
+
+	// If the providerSpec configures the failureDomain reference, validate that the subnets
+	// configuration in both the providerSpec and the referenced failureDomain are consistent.
+	if mscp.failureDomain != nil {
+		if len(mscp.failureDomain.Subnets) != 1 {
+			errMsg = fmt.Sprintf("The failureDomain %q configures %v subnets, and currently only one subnet per failureDomain is supported.", mscp.failureDomain.Name, len(mscp.failureDomain.Subnets))
+			return field.Invalid(fldPath.Child("subnets", "count"), len(mscp.failureDomain.Subnets), errMsg)
+		}
+		fdSubnet := mscp.failureDomain.Subnets[0]
+		switch fdSubnet.Type {
+		case configv1.NutanixIdentifierName:
+			if *fdSubnet.Name != subnetName {
+				errMsg = fmt.Sprintf("The subnets configured in the providerSpec is not consistent with that configured in the failureDomain %q: %q",
+					mscp.failureDomain.Name, *fdSubnet.Name)
+				return field.Invalid(fldPath.Child("subnets", "name"), subnetName, errMsg)
+			}
+		case configv1.NutanixIdentifierUUID:
+			if *fdSubnet.UUID != *subnet.UUID {
+				errMsg = fmt.Sprintf("The subnets configured in the providerSpec is not consistent with that configured in the failureDomain %q: %q",
+					mscp.failureDomain.Name, *fdSubnet.UUID)
+				return field.Invalid(fldPath.Child("subnets", "uuid"), *subnet.UUID, errMsg)
+			}
+		}
 	}
 
 	return nil
@@ -246,7 +294,7 @@ func validateProjectConfig(mscp *machineScope, fldPath *field.Path) *field.Error
 			}
 		}
 	default:
-		errMsg = fmt.Sprintf("Invalid project identifier type, valid types are: %q, %q.", machinev1.NutanixIdentifierName, machinev1.NutanixIdentifierUUID)
+		errMsg = fmt.Sprintf("Invalid project identifier type, valid types are: %q, %q.", configv1.NutanixIdentifierName, configv1.NutanixIdentifierUUID)
 		return field.Invalid(fldPath.Child("project", "type"), mscp.providerSpecValidated.Project.Type, errMsg)
 	}
 
@@ -480,23 +528,30 @@ func deleteVM(ntnxclient *nutanixClientV3.Client, vmUUID string) error {
 func findClusterUuidByName(ntnxclient *nutanixClientV3.Client, clusterName string) (*string, error) {
 	klog.Infof("Checking if cluster with name %q exists.", clusterName)
 
-	res, err := ntnxclient.V3.ListCluster(&nutanixClientV3.DSMetadata{
-		//Kind: utils.StringPtr("cluster"),
-		Filter: utils.StringPtr(fmt.Sprintf("name==%s", clusterName)),
-	})
-	if err != nil || len(res.Entities) == 0 {
-		e1 := fmt.Errorf("Failed to find cluster by name %q. error: %w", clusterName, err)
-		klog.Errorf(e1.Error())
-		return nil, e1
+	r, e := ntnxclient.V3.ListAllCluster("")
+	if e != nil {
+		return nil, fmt.Errorf("Failed to list all clusters. error: %w", e)
 	}
 
-	if len(res.Entities) > 1 {
-		err = fmt.Errorf("Found more than one (%v) clusters with name %q.", len(res.Entities), clusterName)
-		klog.Errorf(err.Error())
-		return nil, err
+	var clusterUUID *string
+	numClusters := 0
+
+	for _, item := range r.Entities {
+		if *item.Spec.Name == clusterName {
+			numClusters++
+			clusterUUID = item.Metadata.UUID
+		}
 	}
 
-	return res.Entities[0].Metadata.UUID, nil
+	if numClusters == 0 {
+		return nil, fmt.Errorf("Unable to find cluster by name %q.", clusterName)
+	}
+
+	if numClusters > 1 {
+		return nil, fmt.Errorf("Found more than one (%v) clusters with name %q.", numClusters, clusterName)
+	}
+
+	return clusterUUID, nil
 }
 
 // findImageByName retrieves the image uuid by the given image name
