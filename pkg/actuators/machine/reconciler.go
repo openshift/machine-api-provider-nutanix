@@ -92,7 +92,7 @@ func (r *Reconciler) update() error {
 			metrics.RegisterFailedInstanceUpdate(&metrics.MachineLabels{
 				Name:      r.machine.Name,
 				Namespace: r.machine.Namespace,
-				Reason:    err.Error(),
+				Reason:    "error finding VM by name",
 			})
 			klog.Errorf("%s: error finding the vm with name %q. error: %v", r.machine.Name, r.machine.Name, err)
 
@@ -109,7 +109,7 @@ func (r *Reconciler) update() error {
 			metrics.RegisterFailedInstanceUpdate(&metrics.MachineLabels{
 				Name:      r.machine.Name,
 				Namespace: r.machine.Namespace,
-				Reason:    err.Error(),
+				Reason:    "error finding VM by UUID",
 			})
 			klog.Errorf("%s: error finding the vm with uuid %s. error: %v", r.machine.Name, vmUuid, err)
 
@@ -122,7 +122,7 @@ func (r *Reconciler) update() error {
 		metrics.RegisterFailedInstanceUpdate(&metrics.MachineLabels{
 			Name:      r.machine.Name,
 			Namespace: r.machine.Namespace,
-			Reason:    err.Error(),
+			Reason:    "error updating VM with VMState",
 		})
 		klog.Errorf("%s: error update machine with VM state. error: %v", r.machine.Name, err)
 
@@ -181,7 +181,7 @@ func (r *Reconciler) delete() error {
 		metrics.RegisterFailedInstanceDelete(&metrics.MachineLabels{
 			Name:      r.machine.Name,
 			Namespace: r.machine.Namespace,
-			Reason:    err.Error(),
+			Reason:    "error deleting VM",
 		})
 		klog.Errorf("%s: error deleting vm with uuid %s. error: %v", r.machine.Name, vmUuid, err)
 		return err
@@ -219,7 +219,7 @@ func (r *Reconciler) exists() (bool, error) {
 		metrics.RegisterFailedInstanceUpdate(&metrics.MachineLabels{
 			Name:      r.machine.Name,
 			Namespace: r.machine.Namespace,
-			Reason:    err.Error(),
+			Reason:    "VM not found",
 		})
 		klog.Errorf("%s: error finding the vm: %w", r.machine.Name, err)
 		return false, err
