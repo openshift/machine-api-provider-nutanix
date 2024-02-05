@@ -236,7 +236,7 @@ func (r *Reconciler) exists() (bool, error) {
 			Namespace: r.machine.Namespace,
 			Reason:    "VM not found",
 		})
-		klog.Errorf("%s: error finding the vm: %w", r.machine.Name, err)
+		klog.Errorf("%s: error finding the vm: %v", r.machine.Name, err)
 		return false, err
 	}
 
@@ -328,7 +328,7 @@ func (r *Reconciler) updateMachineWithVMState(vm *nutanixClientV3.VMIntentRespon
 
 	pcCluster, err := getPrismCentralCluster(r.nutanixClient)
 	if err != nil {
-		klog.Errorf("%s: failed to get prism central cluster. %w", r.machine.Name, err)
+		klog.Errorf("%s: failed to get prism central cluster. %v", r.machine.Name, err)
 		return err
 	}
 
