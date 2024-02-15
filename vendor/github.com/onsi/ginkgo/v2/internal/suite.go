@@ -77,20 +77,6 @@ func NewSuite() *Suite {
 	}
 }
 
-func (suite *Suite) Clone() (*Suite, error) {
-	if suite.phase != PhaseBuildTopLevel {
-		return nil, fmt.Errorf("cannot clone suite after tree has been built")
-	}
-	return &Suite{
-		tree:                    &TreeNode{},
-		phase:                   PhaseBuildTopLevel,
-		ProgressReporterManager: NewProgressReporterManager(),
-		topLevelContainers:      suite.topLevelContainers.Clone(),
-		suiteNodes:              suite.suiteNodes.Clone(),
-		selectiveLock:           &sync.Mutex{},
-	}, nil
-}
-
 func (suite *Suite) BuildTree() error {
 	// During PhaseBuildTopLevel, the top level containers are stored in suite.topLevelCotainers and entered
 	// We now enter PhaseBuildTree where these top level containers are entered and added to the spec tree
@@ -340,16 +326,6 @@ func (suite *Suite) CurrentSpecReport() types.SpecReport {
 	report.ReportEntries = make([]ReportEntry, len(report.ReportEntries))
 	copy(report.ReportEntries, suite.currentSpecReport.ReportEntries)
 	return report
-}
-
-// Only valid in the preview context.  In general suite.report only includes
-// the specs run by _this_ node - it is only at the end of the suite that
-// the parallel reports are aggregated.  However in the preview context we run
-// in series and
-func (suite *Suite) GetPreviewReport() types.Report {
-	suite.selectiveLock.Lock()
-	defer suite.selectiveLock.Unlock()
-	return suite.report
 }
 
 func (suite *Suite) AddReportEntry(entry ReportEntry) error {
@@ -858,7 +834,7 @@ func (suite *Suite) runNode(node Node, specDeadline time.Time, text string) (typ
 	}
 
 	sc := NewSpecContext(suite)
-	defer sc.cancel(fmt.Errorf("spec has finished"))
+	defer sc.cancel()
 
 	suite.selectiveLock.Lock()
 	suite.currentSpecContext = sc
@@ -958,7 +934,7 @@ func (suite *Suite) runNode(node Node, specDeadline time.Time, text string) (typ
 
 			// tell the spec to stop.  it's important we generate the progress report first to make sure we capture where
 			// the spec is actually stuck
-			sc.cancel(fmt.Errorf("%s timeout occurred", timeoutInPlay))
+			sc.cancel()
 			//and now we wait for the grace period
 			gracePeriodChannel = time.After(gracePeriod)
 		case <-interruptStatus.Channel:
@@ -985,7 +961,7 @@ func (suite *Suite) runNode(node Node, specDeadline time.Time, text string) (typ
 			}
 
 			progressReport = progressReport.WithoutOtherGoroutines()
-			sc.cancel(fmt.Errorf(interruptStatus.Message()))
+			sc.cancel()
 
 			if interruptStatus.Level == interrupt_handler.InterruptLevelBailOut {
 				if interruptStatus.ShouldIncludeProgressReport() {
