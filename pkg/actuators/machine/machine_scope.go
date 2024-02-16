@@ -53,10 +53,6 @@ type machineScope struct {
 	machineToBePatched runtimeclient.Patch
 	providerSpec       *machinev1.NutanixMachineProviderConfig
 	providerStatus     *machinev1.NutanixMachineProviderStatus
-	// If the providerSpec configures the failureDomain reference,
-	// we needed to validate that the Machine's providerSpec configuration is
-	// consistent with that of the referenced failureDomain, before creating the Machine VM.
-	failureDomain *configv1.NutanixFailureDomain
 	// For Machine vm create/update use, take a copy of the providerSpec that we can mutate.
 	// This must never be written back to the Machine itself.
 	providerSpecValidated *machinev1.NutanixMachineProviderConfig
@@ -118,37 +114,10 @@ func (s *machineScope) getNutanixClientOptions() (*clientpkg.ClientOptions, erro
 		return nil, err1
 	}
 
-	// If the providerSpec configures the failureDomain reference
-	if s.providerSpec.FailureDomain != nil && s.providerSpec.FailureDomain.Name != "" {
-		fdName := s.providerSpec.FailureDomain.Name
-		// The Machine providerSpec has the failureDomain reference configured
-		for _, fd := range infra.Spec.PlatformSpec.Nutanix.FailureDomains {
-			if fd.Name == fdName {
-				s.failureDomain = &fd
-				klog.V(4).Infof("Machine %q: use the FailureDomain %q.", s.machine.Name, fd.Name)
-				break
-			}
-		}
-
-		// If the failureDomain name not found in the Infrastructure CR
-		if s.failureDomain == nil {
-			err := fmt.Errorf("Could not find the failureDomain with name %q configured in the Infrastructure resource.", fdName)
-			klog.Errorf("Machine %q: %v", s.machine.Name, err)
-			return nil, err
-		}
-	}
-
-	// The default PC endpoint and credential secret name
 	pcEndpoint := infra.Spec.PlatformSpec.Nutanix.PrismCentral.Address
 	pcPort := infra.Spec.PlatformSpec.Nutanix.PrismCentral.Port
-
-	if s.providerSpec.CredentialsSecret == nil || len(s.providerSpec.CredentialsSecret.Name) == 0 {
-		return nil, fmt.Errorf("The nutanix providerSpec credentialsSecret reference is not set.")
-	}
-	credsSecretName := s.providerSpec.CredentialsSecret.Name
-
 	if len(pcEndpoint) == 0 {
-		return nil, fmt.Errorf("The PC endpoint address is not set correctly (empty) in the Infrastreucture CR")
+		return nil, fmt.Errorf("The prismCentralEndpoint field is not set in the Infrastreucture CR")
 	}
 	clientOptions.Credentials.Endpoint = pcEndpoint
 
@@ -157,7 +126,10 @@ func (s *machineScope) getNutanixClientOptions() (*clientpkg.ClientOptions, erro
 	}
 	clientOptions.Credentials.Port = strconv.Itoa(int(pcPort))
 
-	// Retrieve the PC credentials from the referenced local credentials secret
+	if s.providerSpec.CredentialsSecret == nil || len(s.providerSpec.CredentialsSecret.Name) == 0 {
+		return nil, fmt.Errorf("The nutanix providerSpec credentialsSecret reference is not set.")
+	}
+	credsSecretName := s.providerSpec.CredentialsSecret.Name
 	credsSecret := &corev1.Secret{}
 	credsSecretKey := runtimeclient.ObjectKey{
 		Namespace: s.machine.Namespace,
@@ -165,7 +137,7 @@ func (s *machineScope) getNutanixClientOptions() (*clientpkg.ClientOptions, erro
 	}
 	err = s.client.Get(s.Context, credsSecretKey, credsSecret)
 	if err != nil {
-		err1 := fmt.Errorf("Could not find the local credentials secret %q: %w", credsSecretKey.Name, err)
+		err1 := fmt.Errorf("Could not find the local credentials secret %s: %w", credsSecretKey.Name, err)
 		klog.Errorf("Machine %q: %v", s.machine.Name, err1)
 		return nil, err1
 	}

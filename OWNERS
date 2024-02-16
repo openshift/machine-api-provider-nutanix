@@ -3,16 +3,13 @@
 # to be added to the owners-gen input data.
 approvers:
 - JoelSpeed
-- RadekManak
 - elmiko
 reviewers:
 - JoelSpeed
 - RadekManak
 - damdo
 - elmiko
-- nrb
+- lobziik
 - odvarkadaniel
-- racheljpg
-- vincepri
 component: Cloud Compute
 subcomponent: Nutanix Provider

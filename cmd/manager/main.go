@@ -39,7 +39,6 @@ import (
 	machineactuator "github.com/openshift/machine-api-provider-nutanix/pkg/actuators/machine"
 	machinesetcontroller "github.com/openshift/machine-api-provider-nutanix/pkg/actuators/machineset"
 	"github.com/openshift/machine-api-provider-nutanix/pkg/version"
-	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
 // The default durations for the leader electrion operations.
@@ -115,22 +114,16 @@ func main() {
 		LeaderElectionID:        "cluster-api-provider-nutanix-leader",
 		LeaseDuration:           leaderElectLeaseDuration,
 		HealthProbeBindAddress:  *healthAddr,
-		Cache: cache.Options{
-			SyncPeriod: &syncPeriod,
-		},
-		Metrics: metricsserver.Options{
-			BindAddress: *metricsAddress,
-		},
+		SyncPeriod:              &syncPeriod,
+		MetricsBindAddress:      *metricsAddress,
 		// Slow the default retry and renew election rate to reduce etcd writes at idle: BZ 1858400
 		RetryPeriod:   &retryPeriod,
 		RenewDeadline: &renewDeadline,
 	}
 
 	if *watchNamespace != "" {
-		opts.Cache.DefaultNamespaces = map[string]cache.Config{
-			*watchNamespace: {},
-		}
-		klog.Infof("Watching machine-api objects only in namespace %q for reconciliation.", *watchNamespace)
+		opts.Namespace = *watchNamespace
+		klog.Infof("Watching machine-api objects only in namespace %q for reconciliation.", opts.Namespace)
 	}
 
 	mgr, err := manager.New(cfg, opts)
@@ -201,11 +194,9 @@ func main() {
 // namespace.
 func newConfigManagedClient(mgr manager.Manager) (runtimeclient.Client, manager.Runnable, error) {
 	cacheOpts := cache.Options{
-		Scheme: mgr.GetScheme(),
-		Mapper: mgr.GetRESTMapper(),
-		DefaultNamespaces: map[string]cache.Config{
-			"openshift-config-managed": {},
-		},
+		Scheme:     mgr.GetScheme(),
+		Mapper:     mgr.GetRESTMapper(),
+		Namespaces: []string{"openshift-config-managed"},
 	}
 	cache, err := cache.New(mgr.GetConfig(), cacheOpts)
 	if err != nil {

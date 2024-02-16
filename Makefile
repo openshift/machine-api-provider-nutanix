@@ -65,12 +65,6 @@ else
   IMAGE_BUILD_CMD = $(ENGINE) build
 endif
 
-PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
-CONTROLLER_GEN = go run ${PROJECT_DIR}/vendor/sigs.k8s.io/controller-tools/cmd/controller-gen
-ENVTEST = go run ${PROJECT_DIR}/vendor/sigs.k8s.io/controller-runtime/tools/setup-envtest
-# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.29
-
 .PHONY: vendor
 vendor:
 	$(DOCKER_CMD) hack/go-mod.sh
@@ -79,6 +73,11 @@ generate: gogen goimports
 
 gogen:
 	$(DOCKER_CMD) go generate ./pkg/... ./cmd/...
+
+.PHONY: test
+test: ## Run tests
+	@echo -e "\033[32mTesting...\033[0m"
+	$(DOCKER_CMD) hack/ci-test.sh
 
 bin:
 	@mkdir $@
@@ -103,12 +102,9 @@ push:
 .PHONY: check
 check: fmt vet lint test # Check your code
 
-.PHONY: test
-test: unit
-
 .PHONY: unit
 unit: # Run unit test
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(PROJECT_DIR)/bin)" ./hack/ci-test.sh
+	$(DOCKER_CMD) go test -v -race -cover ./cmd/... ./pkg/...
 
 .PHONY: test-e2e
 test-e2e: ## Run e2e tests

@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -70,7 +69,9 @@ type Reflector struct {
 	listerWatcher ListerWatcher
 	// backoff manages backoff of ListWatch
 	backoffManager wait.BackoffManager
-	resyncPeriod   time.Duration
+	// initConnBackoffManager manages backoff the initial connection with the Watch call of ListAndWatch.
+	initConnBackoffManager wait.BackoffManager
+	resyncPeriod           time.Duration
 	// clock allows tests to manipulate time
 	clock clock.Clock
 	// paginatedResult defines whether pagination should be forced for list calls.
@@ -219,10 +220,11 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 		// We used to make the call every 1sec (1 QPS), the goal here is to achieve ~98% traffic reduction when
 		// API server is not healthy. With these parameters, backoff will stop at [30,60) sec interval which is
 		// 0.22 QPS. If we don't backoff for 2min, assume API server is healthy and we reset the backoff.
-		backoffManager:    wait.NewExponentialBackoffManager(800*time.Millisecond, 30*time.Second, 2*time.Minute, 2.0, 1.0, reflectorClock),
-		clock:             reflectorClock,
-		watchErrorHandler: WatchErrorHandler(DefaultWatchErrorHandler),
-		expectedType:      reflect.TypeOf(expectedType),
+		backoffManager:         wait.NewExponentialBackoffManager(800*time.Millisecond, 30*time.Second, 2*time.Minute, 2.0, 1.0, reflectorClock),
+		initConnBackoffManager: wait.NewExponentialBackoffManager(800*time.Millisecond, 30*time.Second, 2*time.Minute, 2.0, 1.0, reflectorClock),
+		clock:                  reflectorClock,
+		watchErrorHandler:      WatchErrorHandler(DefaultWatchErrorHandler),
+		expectedType:           reflect.TypeOf(expectedType),
 	}
 
 	if r.name == "" {
@@ -235,10 +237,6 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 
 	if r.expectedGVK == nil {
 		r.expectedGVK = getExpectedGVKFromObject(expectedType)
-	}
-
-	if s := os.Getenv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA"); len(s) > 0 {
-		r.UseWatchList = true
 	}
 
 	return r
@@ -334,9 +332,12 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			return nil
 		}
 		if err != nil {
-			klog.Warningf("The watchlist request ended with an error, falling back to the standard LIST/WATCH semantics because making progress is better than deadlocking, err = %v", err)
+			if !apierrors.IsInvalid(err) {
+				return err
+			}
+			klog.Warning("the watch-list feature is not supported by the server, falling back to the previous LIST/WATCH semantic")
 			fallbackToList = true
-			// ensure that we won't accidentally pass some garbage down the watch.
+			// Ensure that we won't accidentally pass some garbage down the watch.
 			w = nil
 		}
 	}
@@ -347,8 +348,6 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			return err
 		}
 	}
-
-	klog.V(2).Infof("Caches populated for %v from %s", r.typeDescription, r.name)
 
 	resyncerrc := make(chan error, 1)
 	cancelCh := make(chan struct{})
@@ -394,11 +393,6 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 		// give the stopCh a chance to stop the loop, even in case of continue statements further down on errors
 		select {
 		case <-stopCh:
-			// we can only end up here when the stopCh
-			// was closed after a successful watchlist or list request
-			if w != nil {
-				w.Stop()
-			}
 			return nil
 		default:
 		}
@@ -426,7 +420,7 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 					select {
 					case <-stopCh:
 						return nil
-					case <-r.backoffManager.Backoff().C():
+					case <-r.initConnBackoffManager.Backoff().C():
 						continue
 					}
 				}
@@ -452,7 +446,7 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 					select {
 					case <-stopCh:
 						return nil
-					case <-r.backoffManager.Backoff().C():
+					case <-r.initConnBackoffManager.Backoff().C():
 						continue
 					}
 				case apierrors.IsInternalError(err) && retry.ShouldRetry():
@@ -514,7 +508,7 @@ func (r *Reflector) list(stopCh <-chan struct{}) error {
 			pager.PageSize = 0
 		}
 
-		list, paginatedResult, err = pager.ListWithAlloc(context.Background(), options)
+		list, paginatedResult, err = pager.List(context.Background(), options)
 		if isExpiredError(err) || isTooLargeResourceVersionError(err) {
 			r.setIsLastSyncResourceVersionUnavailable(true)
 			// Retry immediately if the resource version used to list is unavailable.
@@ -523,7 +517,7 @@ func (r *Reflector) list(stopCh <-chan struct{}) error {
 			// resource version it is listing at is expired or the cache may not yet be synced to the provided
 			// resource version. So we need to fallback to resourceVersion="" in all to recover and ensure
 			// the reflector makes forward progress.
-			list, paginatedResult, err = pager.ListWithAlloc(context.Background(), metav1.ListOptions{ResourceVersion: r.relistResourceVersion()})
+			list, paginatedResult, err = pager.List(context.Background(), metav1.ListOptions{ResourceVersion: r.relistResourceVersion()})
 		}
 		close(listCh)
 	}()
@@ -561,7 +555,7 @@ func (r *Reflector) list(stopCh <-chan struct{}) error {
 	}
 	resourceVersion = listMetaInterface.GetResourceVersion()
 	initTrace.Step("Resource version extracted")
-	items, err := meta.ExtractListWithAlloc(list)
+	items, err := meta.ExtractList(list)
 	if err != nil {
 		return fmt.Errorf("unable to understand list result %#v (%v)", list, err)
 	}
@@ -605,7 +599,7 @@ func (r *Reflector) watchList(stopCh <-chan struct{}) (watch.Interface, error) {
 	isErrorRetriableWithSideEffectsFn := func(err error) bool {
 		if canRetry := isWatchErrorRetriable(err); canRetry {
 			klog.V(2).Infof("%s: watch-list of %v returned %v - backing off", r.name, r.typeDescription, err)
-			<-r.backoffManager.Backoff().C()
+			<-r.initConnBackoffManager.Backoff().C()
 			return true
 		}
 		if isExpiredError(err) || isTooLargeResourceVersionError(err) {
@@ -674,12 +668,6 @@ func (r *Reflector) watchList(stopCh <-chan struct{}) (watch.Interface, error) {
 	// "k8s.io/initial-events-end" bookmark.
 	initTrace.Step("Objects streamed", trace.Field{Key: "count", Value: len(temporaryStore.List())})
 	r.setIsLastSyncResourceVersionUnavailable(false)
-
-	// we utilize the temporaryStore to ensure independence from the current store implementation.
-	// as of today, the store is implemented as a queue and will be drained by the higher-level
-	// component as soon as it finishes replacing the content.
-	checkWatchListConsistencyIfRequested(stopCh, r.name, resourceVersion, r.listerWatcher, temporaryStore)
-
 	if err = r.store.Replace(temporaryStore.List(), resourceVersion); err != nil {
 		return nil, fmt.Errorf("unable to sync watch-list result: %v", err)
 	}
@@ -772,7 +760,7 @@ loop:
 				}
 			case watch.Bookmark:
 				// A `Bookmark` means watch has synced here, just update the resourceVersion
-				if meta.GetAnnotations()["k8s.io/initial-events-end"] == "true" {
+				if _, ok := meta.GetAnnotations()["k8s.io/initial-events-end"]; ok {
 					if exitOnInitialEventsEndBookmark != nil {
 						*exitOnInitialEventsEndBookmark = true
 					}

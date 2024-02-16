@@ -35,7 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
 var _ = Describe("MachineSet Reconciler", func() {
@@ -45,7 +44,7 @@ var _ = Describe("MachineSet Reconciler", func() {
 	var namespace *corev1.Namespace
 
 	BeforeEach(func() {
-		mgr, err := manager.New(cfg, manager.Options{Metrics: metricsserver.Options{BindAddress: "0"}})
+		mgr, err := manager.New(cfg, manager.Options{MetricsBindAddress: "0"})
 		Expect(err).ToNot(HaveOccurred())
 
 		r := Reconciler{
