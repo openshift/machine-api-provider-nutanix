@@ -214,29 +214,39 @@ func (s *machineScope) setProviderStatus(vm *nutanixClientV3.VMIntentResponse, c
 	}
 
 	// update the Machine providerStatus
-	s.providerStatus.VmUUID = vm.Metadata.UUID
+	machineAddresses := []corev1.NodeAddress{}
+	vmIPEndpoints := make(map[string]bool)
 
-	// update machine.status.addresses
-	addresses := s.machine.Status.Addresses
-	addr := getExistingAddress(addresses, corev1.NodeInternalIP)
-	if addr != nil {
-		addr.Address = *vm.Status.Resources.NicList[0].IPEndpointList[0].IP
-	} else {
-		addresses = append(addresses, corev1.NodeAddress{
+	for _, nic := range vm.Status.Resources.NicList {
+		for _, ipEndpoint := range nic.IPEndpointList {
+			if ipEndpoint.IP != nil && *ipEndpoint.IP != "" {
+				vmIPEndpoints[*ipEndpoint.IP] = true
+			}
+		}
+	}
+
+	// add the NodeInternalIP addresses to the Machine object using the vm's vmIPEndpoints
+	for ip, _ := range vmIPEndpoints {
+		// add the ip address to the Machine object.
+		machineAddresses = append(machineAddresses, corev1.NodeAddress{
 			Type:    corev1.NodeInternalIP,
-			Address: *vm.Status.Resources.NicList[0].IPEndpointList[0].IP,
+			Address: ip,
 		})
 	}
-	addr = getExistingAddress(addresses, corev1.NodeInternalDNS)
-	if addr != nil {
-		addr.Address = *vm.Spec.Name
-	} else {
-		addresses = append(addresses, corev1.NodeAddress{
-			Type:    corev1.NodeInternalDNS,
-			Address: *vm.Spec.Name,
-		})
-	}
-	s.machine.Status.Addresses = addresses
+
+	// add the NodeInternalDNS and NodeHostName addresses to the Machine object using the vm name
+	vmName := *vm.Spec.Name
+	machineAddresses = append(machineAddresses, corev1.NodeAddress{
+		Type:    corev1.NodeInternalDNS,
+		Address: vmName,
+	})
+	machineAddresses = append(machineAddresses, corev1.NodeAddress{
+		Type:    corev1.NodeHostName,
+		Address: vmName,
+	})
+
+	s.machine.Status.Addresses = machineAddresses
+	klog.V(3).Infof("%s: the machine status.addresses=%+v.", s.machine.Name, s.machine.Status.Addresses)
 
 	s.providerStatus.Conditions = setNutanixProviderConditions([]metav1.Condition{condition}, s.providerStatus.Conditions)
 
