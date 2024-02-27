@@ -28,6 +28,8 @@ spec:
   replicas: 1
   template:
     metadata:
+      annotations:
+        openshift.io/required-scc: restricted-v2
       labels:
         api: clusterapi
         k8s-app: controller
