@@ -1,4 +1,4 @@
 #!/bin/sh
 cd /tmp
-go get -u github.com/openshift/imagebuilder/cmd/imagebuilder
+go install github.com/openshift/imagebuilder/cmd/imagebuilder@latest
 cd -
