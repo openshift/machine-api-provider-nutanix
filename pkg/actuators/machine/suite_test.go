@@ -48,7 +48,7 @@ func TestMain(m *testing.M) {
 	}()
 
 	mgr, err := manager.New(cfg, manager.Options{
-		Scheme:             scheme.Scheme,
+		Scheme:  scheme.Scheme,
 		Metrics: metricsserver.Options{BindAddress: "0"},
 	})
 	if err != nil {
