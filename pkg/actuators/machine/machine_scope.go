@@ -300,7 +300,7 @@ func (s *machineScope) setProviderStatus(vm *nutanixClientV3.VMIntentResponse, c
 	}
 
 	// add the NodeInternalIP addresses to the Machine object using the vm's vmIPEndpoints
-	for ip, _ := range vmIPEndpoints {
+	for ip := range vmIPEndpoints {
 		// add the ip address to the Machine object.
 		machineAddresses = append(machineAddresses, corev1.NodeAddress{
 			Type:    corev1.NodeInternalIP,
