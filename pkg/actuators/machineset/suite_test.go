@@ -62,7 +62,7 @@ var _ = BeforeSuite(func(ctx SpecContext) {
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
-			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1beta1"),
+			filepath.Join("..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1beta1", "zz_generated.crd-manifests"),
 		},
 	}
 	machinev1.AddToScheme(scheme.Scheme)
