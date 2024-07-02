@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nutanix-cloud-native/prism-go-client/pkg/utils"
+	"github.com/nutanix-cloud-native/prism-go-client/utils"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"

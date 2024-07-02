@@ -1,7 +1,7 @@
 package machine
 
 import (
-	"github.com/nutanix-cloud-native/prism-go-client/pkg/utils"
+	"github.com/nutanix-cloud-native/prism-go-client/utils"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	corev1 "k8s.io/api/core/v1"
