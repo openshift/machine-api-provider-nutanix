@@ -27,6 +27,8 @@ require (
 	sigs.k8s.io/controller-tools v0.15.0
 )
 
+require k8s.io/component-base v0.30.1
+
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
@@ -118,7 +120,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.30.1 // indirect
 	k8s.io/cli-runtime v0.30.0 // indirect
-	k8s.io/component-base v0.30.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
 	k8s.io/kubectl v0.30.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
