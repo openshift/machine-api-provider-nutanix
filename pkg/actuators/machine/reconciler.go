@@ -1,11 +1,12 @@
 package machine
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
-	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix/v3"
+	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
@@ -41,6 +42,9 @@ func newReconciler(scope *machineScope) *Reconciler {
 func (r *Reconciler) create() error {
 	klog.Infof("%s: creating machine", r.machine.Name)
 
+	ctx, cancel := context.WithTimeout(r.Context, 300*time.Second)
+	defer cancel()
+
 	if err := validateMachine(*r.machine); err != nil {
 		e1 := fmt.Errorf("%v: failed validating machine provider spec: %w", r.machine.GetName(), err)
 		klog.Error(e1.Error())
@@ -52,14 +56,14 @@ func (r *Reconciler) create() error {
 		return fmt.Errorf("failed to get user data: %w", err)
 	}
 
-	if errList := validateVMConfig(r.machineScope); len(errList) > 0 {
+	if errList := validateVMConfig(ctx, r.machineScope); len(errList) > 0 {
 		machineErr := machinecontroller.InvalidMachineConfiguration(
 			"%v: failed in validating machine providerSpec: %v",
 			r.machine.GetName(), errList.ToAggregate().Error())
 		return machineErr
 	}
 
-	vm, err := createVM(r.machineScope, userData)
+	vm, err := createVM(ctx, r.machineScope, userData)
 	if err != nil {
 		klog.Errorf("%s: error creating machine vm. error: %v", r.machine.Name, err)
 		r.machineScope.setProviderStatus(nil, conditionFailed(machineCreation, err.Error()))
@@ -67,7 +71,7 @@ func (r *Reconciler) create() error {
 	}
 
 	klog.Infof("Created VM %q, with vm uuid: %s", r.machine.Name, *vm.Metadata.UUID)
-	if err = r.updateMachineWithVMState(vm); err != nil {
+	if err = r.updateMachineWithVMState(ctx, vm); err != nil {
 		return fmt.Errorf("failed to update machine with vm state: %w", err)
 	}
 
@@ -80,6 +84,9 @@ func (r *Reconciler) create() error {
 func (r *Reconciler) update() error {
 	klog.Infof("%s: updating machine", r.machine.Name)
 
+	ctx, cancel := context.WithTimeout(r.Context, 120*time.Second)
+	defer cancel()
+
 	err := validateMachine(*r.machine)
 	if err != nil {
 		return fmt.Errorf("%v: failed validating machine provider spec: %w", r.machine.GetName(), err)
@@ -88,7 +95,7 @@ func (r *Reconciler) update() error {
 	var vm *nutanixClientV3.VMIntentResponse
 	if r.providerStatus.VmUUID == nil {
 		// Try to find the vm by name
-		vm, err = findVMByName(r.nutanixClient, r.machine.Name)
+		vm, err = findVMByName(ctx, r.nutanixClient, r.machine.Name)
 		if err != nil {
 			metrics.RegisterFailedInstanceUpdate(&metrics.MachineLabels{
 				Name:      r.machine.Name,
@@ -105,7 +112,7 @@ func (r *Reconciler) update() error {
 	} else {
 		// find the existing VM with the vmUuid
 		vmUuid := *r.providerStatus.VmUUID
-		vm, err = findVMByUUID(r.nutanixClient, vmUuid)
+		vm, err = findVMByUUID(ctx, r.nutanixClient, vmUuid)
 		if err != nil {
 			metrics.RegisterFailedInstanceUpdate(&metrics.MachineLabels{
 				Name:      r.machine.Name,
@@ -133,7 +140,7 @@ func (r *Reconciler) update() error {
 		return err
 	}
 
-	if err = r.updateMachineWithVMState(vm); err != nil {
+	if err = r.updateMachineWithVMState(ctx, vm); err != nil {
 		metrics.RegisterFailedInstanceUpdate(&metrics.MachineLabels{
 			Name:      r.machine.Name,
 			Namespace: r.machine.Namespace,
@@ -155,16 +162,19 @@ func (r *Reconciler) update() error {
 func (r *Reconciler) delete() error {
 	klog.Infof("%s: deleting machine's vm", r.machine.Name)
 
+	ctx, cancel := context.WithTimeout(r.Context, 120*time.Second)
+	defer cancel()
+
 	var err error
 	var vm *nutanixClientV3.VMIntentResponse
 
 	// Check if the machine vm exists
 	if r.providerStatus.VmUUID != nil {
 		// Try to find the vm by uuid
-		vm, err = findVMByUUID(r.nutanixClient, *r.providerStatus.VmUUID)
+		vm, err = findVMByUUID(ctx, r.nutanixClient, *r.providerStatus.VmUUID)
 	} else {
 		// Try to find the vm by name
-		vm, err = findVMByName(r.nutanixClient, r.machine.Name)
+		vm, err = findVMByName(ctx, r.nutanixClient, r.machine.Name)
 	}
 	if err != nil {
 		if strings.Contains(err.Error(), "NOT_FOUND") {
@@ -191,7 +201,7 @@ func (r *Reconciler) delete() error {
 	}
 
 	// Delete vm with the vmUuid
-	err = deleteVM(r.nutanixClient, vmUuid)
+	err = deleteVM(ctx, r.nutanixClient, vmUuid)
 	if err != nil {
 		metrics.RegisterFailedInstanceDelete(&metrics.MachineLabels{
 			Name:      r.machine.Name,
@@ -212,6 +222,9 @@ func (r *Reconciler) delete() error {
 
 // exists returns true if machine corresponding VM exists.
 func (r *Reconciler) exists() (bool, error) {
+	ctx, cancel := context.WithTimeout(r.Context, 60*time.Second)
+	defer cancel()
+
 	err := validateMachine(*r.machine)
 	if err != nil {
 		return false, fmt.Errorf("%s: failed validating machine provider spec. %w", r.machine.GetName(), err)
@@ -220,10 +233,10 @@ func (r *Reconciler) exists() (bool, error) {
 	if r.providerStatus.VmUUID != nil {
 		// Try to find the vm by uuid
 		vmUuid := *r.providerStatus.VmUUID
-		_, err = findVMByUUID(r.nutanixClient, vmUuid)
+		_, err = findVMByUUID(ctx, r.nutanixClient, vmUuid)
 	} else {
 		// Try to find the vm by name
-		_, err = findVMByName(r.nutanixClient, r.machine.Name)
+		_, err = findVMByName(ctx, r.nutanixClient, r.machine.Name)
 	}
 
 	if err != nil {
@@ -315,7 +328,7 @@ func (r *Reconciler) setProviderID(vmUUID *string) error {
 	return nil
 }
 
-func (r *Reconciler) updateMachineWithVMState(vm *nutanixClientV3.VMIntentResponse) error {
+func (r *Reconciler) updateMachineWithVMState(ctx context.Context, vm *nutanixClientV3.VMIntentResponse) error {
 	if vm == nil {
 		return nil
 	}
@@ -326,7 +339,7 @@ func (r *Reconciler) updateMachineWithVMState(vm *nutanixClientV3.VMIntentRespon
 		return err
 	}
 
-	pcCluster, err := getPrismCentralCluster(r.nutanixClient)
+	pcCluster, err := getPrismCentralCluster(ctx, r.nutanixClient)
 	if err != nil {
 		klog.Errorf("%s: failed to get prism central cluster. %v", r.machine.Name, err)
 		return err

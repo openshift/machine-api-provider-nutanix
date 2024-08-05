@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nutanix-cloud-native/prism-go-client/pkg/utils"
+	"github.com/nutanix-cloud-native/prism-go-client/utils"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
@@ -130,6 +130,9 @@ func TestMachineEvents(t *testing.T) {
 				pspec.SystemDiskSize = resource.MustParse("18Gi")
 				pspec.BootType = "invalid-boottype"
 				pspec.Project.Type = "uuid"
+				dataDisk := machinev1.NutanixVMDisk{}
+				dataDisk.DiskSize = resource.MustParse("500Mi")
+				pspec.DataDisks = append(pspec.DataDisks, dataDisk)
 				return pspec
 			}(),
 			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
@@ -144,6 +147,7 @@ func TestMachineEvents(t *testing.T) {
 				"The minimum systemDiskSize is 20Gi bytes",
 				"Invalid bootType, the valid bootType values are: \"\", \"Legacy\", \"UEFI\", \"SecureBoot\"",
 				"Missing project uuid",
+				"The minimum diskSize is 1Gi bytes.",
 			},
 		},
 		{

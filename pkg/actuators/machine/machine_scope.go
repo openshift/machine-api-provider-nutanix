@@ -15,8 +15,8 @@ import (
 	clientpkg "github.com/openshift/machine-api-provider-nutanix/pkg/client"
 	dataurl "github.com/vincent-petithory/dataurl"
 
-	nutanixClient "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix"
-	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/pkg/nutanix/v3"
+	nutanixClient "github.com/nutanix-cloud-native/prism-go-client"
+	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/v3"
 	corev1 "k8s.io/api/core/v1"
 	apimachineryerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
