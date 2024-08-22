@@ -27,7 +27,11 @@ require (
 	sigs.k8s.io/controller-tools v0.15.0
 )
 
-require k8s.io/component-base v0.30.1
+require (
+	github.com/openshift/library-go v0.0.0-20240822162747-42bcbbc4ccc6
+	k8s.io/apiserver v0.30.1
+	k8s.io/component-base v0.30.1
+)
 
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
@@ -87,7 +91,6 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/openshift/client-go v0.0.0-20240528061634-b054aa794d87 // indirect
-	github.com/openshift/library-go v0.0.0-20240723172506-8bb8fe6cc56d // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_golang v1.18.0 // indirect
