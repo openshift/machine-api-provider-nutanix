@@ -17,11 +17,15 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
+	apifeatures "github.com/openshift/api/features"
+	"github.com/openshift/library-go/pkg/features"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apiserver/pkg/util/feature"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	k8sflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -93,8 +97,15 @@ func main() {
 		"The address for health checking.",
 	)
 
-	featureGateArgs := map[string]bool{}
-	flag.Var(k8sflag.NewMapStringBool(&featureGateArgs), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimen")
+	// Sets up feature gates
+	defaultMutableGate := feature.DefaultMutableFeatureGate
+	gateOpts, err := features.NewFeatureGateOptions(defaultMutableGate, apifeatures.SelfManaged, apifeatures.FeatureGateMachineAPIMigration)
+	if err != nil {
+		klog.Fatalf("Error setting up feature gates: %v", err)
+	}
+
+	// Add the --feature-gates flag
+	gateOpts.AddFlagsToGoFlagSet(nil)
 
 	klog.InitFlags(nil)
 	flag.Set("logtostderr", "true")
@@ -110,6 +121,18 @@ func main() {
 	if err != nil {
 		klog.Fatalf("Error getting configuration: %v", err)
 	}
+
+	// Sets feature gates from flags
+	klog.Infof("Initializing feature gates: %s", strings.Join(defaultMutableGate.KnownFeatures(), ", "))
+	warnings, err := gateOpts.ApplyTo(defaultMutableGate)
+	if err != nil {
+		klog.Fatalf("Error setting feature gates from flags: %v", err)
+	}
+	if len(warnings) > 0 {
+		klog.Infof("Warnings setting feature gates from flags: %v", warnings)
+	}
+
+	klog.Infof("FeatureGateMachineAPIMigration initialised: %t", defaultMutableGate.Enabled(featuregate.Feature(apifeatures.FeatureGateMachineAPIMigration)))
 
 	// Setup a Manager
 	syncPeriod := 10 * time.Minute
@@ -172,7 +195,7 @@ func main() {
 		ConfigManagedClient: configManagedClient,
 	})
 
-	if err := machine.AddWithActuator(mgr, machineActuator); err != nil {
+	if err := machine.AddWithActuator(mgr, machineActuator, defaultMutableGate); err != nil {
 		klog.Fatalf("Error adding actuator: %v", err)
 	}
 
