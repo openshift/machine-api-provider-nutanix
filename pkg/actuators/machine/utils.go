@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/nutanix-cloud-native/prism-go-client/utils"
 	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/v3"
+	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
@@ -23,6 +25,9 @@ const (
 	upstreamMachineClusterIDLabel = "sigs.k8s.io/cluster-api-cluster"
 	globalInfrastuctureName       = "cluster"
 	openshiftConfigNamespace      = "openshift-config"
+
+	fiveMinutes = 5 * time.Minute  // 5m0s
+	tenSeconds  = 10 * time.Second // 10s
 )
 
 // RawExtensionFromNutanixMachineProviderSpec marshals the machine provider spec.
@@ -478,4 +483,74 @@ func getGPUsForPE(ctx context.Context, client *nutanixClientV3.Client, peUUID st
 	}
 
 	return gpus, nil
+}
+
+// getMachineResourceIdentifierFromFailureDomainConfig returns NutanixResourceIdentifier for machine's providerSpec from the corresponding configuration in the FailureDomain
+func getMachineResourceIdentifierFromFailureDomainConfig(nri configv1.NutanixResourceIdentifier) machinev1.NutanixResourceIdentifier {
+	ret := machinev1.NutanixResourceIdentifier{}
+	switch nri.Type {
+	case configv1.NutanixIdentifierUUID:
+		ret.Type = machinev1.NutanixIdentifierUUID
+	case configv1.NutanixIdentifierName:
+		ret.Type = machinev1.NutanixIdentifierName
+	}
+	ret.UUID = nri.UUID
+	ret.Name = nri.Name
+
+	return ret
+}
+
+// waitForTask waits until a queued task has been finished or timeout has been reached.
+func waitForTask(clientV3 nutanixClientV3.Service, taskUUID string) error {
+	finished := false
+	var err error
+	for start := time.Now(); time.Since(start) < fiveMinutes; {
+		finished, err = isTaskFinished(clientV3, taskUUID)
+		if err != nil {
+			return err
+		}
+		if finished {
+			break
+		}
+		time.Sleep(tenSeconds)
+	}
+
+	if !finished {
+		return fmt.Errorf("timeout while waiting for task UUID: %s", taskUUID)
+	}
+
+	return nil
+}
+
+func isTaskFinished(clientV3 nutanixClientV3.Service, taskUUID string) (bool, error) {
+	isFinished := map[string]bool{
+		"QUEUED":    false,
+		"RUNNING":   false,
+		"SUCCEEDED": true,
+	}
+	status, err := getTaskStatus(clientV3, taskUUID)
+	if err != nil {
+		return false, err
+	}
+
+	if val, ok := isFinished[status]; ok {
+		return val, nil
+	}
+
+	return false, fmt.Errorf("retrieved unexpected task status: %s", status)
+}
+
+func getTaskStatus(clientV3 nutanixClientV3.Service, taskUUID string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 60*time.Second)
+	defer cancel()
+
+	v, err := clientV3.GetTask(ctx, taskUUID)
+	if err != nil {
+		return "", err
+	}
+
+	if *v.Status == "INVALID_UUID" || *v.Status == "FAILED" {
+		return *v.Status, fmt.Errorf("error_detail: %s, progress_message: %s", utils.StringValue(v.ErrorDetail), utils.StringValue(v.ProgressMessage))
+	}
+	return *v.Status, nil
 }

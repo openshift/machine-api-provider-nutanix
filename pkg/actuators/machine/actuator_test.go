@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nutanix-cloud-native/prism-go-client/utils"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
@@ -123,8 +122,7 @@ func TestMachineEvents(t *testing.T) {
 				pspec := getValidProviderSpec("")
 				pspec.Cluster.Type = "invalid-type"
 				pspec.Image.Name = nil
-				pspec.Subnets = append(pspec.Subnets,
-					machinev1.NutanixResourceIdentifier{Type: "uuid", UUID: utils.StringPtr("c7938dc6-7659-453e-a688-e26020c68g02")})
+				pspec.Subnets[0].Name = nil
 				pspec.VCPUSockets = 0
 				pspec.MemorySize = resource.MustParse("1.5Gi")
 				pspec.SystemDiskSize = resource.MustParse("18Gi")
@@ -141,7 +139,7 @@ func TestMachineEvents(t *testing.T) {
 			events: []string{
 				"Invalid cluster identifier type",
 				"Missing image name",
-				"more than one subnets are configured",
+				"Missing subnet name",
 				"The minimum vCPU sockets of the VM is 1",
 				"The minimum memorySize is 2Gi bytes",
 				"The minimum systemDiskSize is 20Gi bytes",

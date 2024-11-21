@@ -26,6 +26,16 @@ func validateVMConfig(ctx context.Context, mscp *machineScope) field.ErrorList {
 	// Will use the parameters in providerSpecValidated to create the VM
 	mscp.providerSpecValidated = mscp.providerSpec.DeepCopy()
 
+	// If the providerSpec configures the failureDomain reference, use the referenced failureDomain's
+	// configuration for correponding configuration in the providerSpec
+	if mscp.failureDomain != nil {
+		mscp.providerSpecValidated.Cluster = getMachineResourceIdentifierFromFailureDomainConfig(mscp.failureDomain.Cluster)
+		mscp.providerSpecValidated.Subnets = make([]machinev1.NutanixResourceIdentifier, len(mscp.failureDomain.Subnets))
+		for i, subnet := range mscp.failureDomain.Subnets {
+			mscp.providerSpecValidated.Subnets[i] = getMachineResourceIdentifierFromFailureDomainConfig(subnet)
+		}
+	}
+
 	// verify the cluster configuration
 	if fldErr := validateClusterConfig(ctx, mscp, fldPath); fldErr != nil {
 		errList = append(errList, fldErr)
@@ -37,20 +47,14 @@ func validateVMConfig(ctx context.Context, mscp *machineScope) field.ErrorList {
 	}
 
 	// verify the subnets configuration
-	// Currently we only allow and support one subnet per VM
-	// We may extend to allow and support more than one subnets per VM, in the future release
-	if len(mscp.providerSpecValidated.Subnets) == 0 {
+	numOfSubnets := len(mscp.providerSpecValidated.Subnets)
+	switch {
+	case numOfSubnets == 0:
 		errList = append(errList, field.Required(fldPath.Child("subnets"), "Missing subnets"))
-
-	} else if len(mscp.providerSpecValidated.Subnets) > 1 {
-		errMsg = "Currently we only allow and support one subnet per VM, but more than one subnets are configured."
-		errList = append(errList, field.Invalid(fldPath.Child("subnets"), len(mscp.providerSpecValidated.Subnets), errMsg))
-
-	} else {
-		subnet := &mscp.providerSpecValidated.Subnets[0]
-		if fldErr := validateSubnetConfig(ctx, mscp, subnet, fldPath); fldErr != nil {
-			errList = append(errList, fldErr)
-		}
+	case numOfSubnets > 32:
+		errList = append(errList, field.TooMany(fldPath.Child("subnets"), numOfSubnets, 32))
+	default:
+		errList = append(errList, validateSubnetsConfig(ctx, mscp, fldPath)...)
 	}
 
 	// verify the vcpusPerSocket configuration
@@ -285,34 +289,14 @@ func validateClusterConfig(ctx context.Context, mscp *machineScope, fldPath *fie
 			return field.Required(fldPath.Child("cluster", "uuid"), "Missing cluster uuid")
 		} else {
 			clusterUUID := *mscp.providerSpecValidated.Cluster.UUID
-			if res, err := mscp.nutanixClient.V3.GetCluster(ctx, clusterUUID); err != nil {
+			if _, err := mscp.nutanixClient.V3.GetCluster(ctx, clusterUUID); err != nil {
 				errMsg = fmt.Sprintf("Failed to find cluster with uuid %v. error: %v", clusterUUID, err)
 				return field.Invalid(fldPath.Child("cluster", "uuid"), clusterUUID, errMsg)
-			} else {
-				clusterName = *res.Spec.Name
 			}
 		}
 	default:
 		errMsg = fmt.Sprintf("Invalid cluster identifier type, valid types are: %q, %q.", configv1.NutanixIdentifierName, configv1.NutanixIdentifierUUID)
 		return field.Invalid(fldPath.Child("cluster", "type"), mscp.providerSpecValidated.Cluster.Type, errMsg)
-	}
-
-	// If the providerSpec configures the failureDomain reference, validate that the cluster
-	// configuration in both the providerSpec and the referenced failureDomain are consistent.
-	if mscp.failureDomain != nil {
-		fd := mscp.failureDomain
-		switch fd.Cluster.Type {
-		case configv1.NutanixIdentifierName:
-			if *fd.Cluster.Name != clusterName {
-				errMsg = fmt.Sprintf("The cluster configured in the providerSpec is not consistent with that configured in the failureDomain %q: %q", fd.Name, *fd.Cluster.Name)
-				return field.Invalid(fldPath.Child("cluster", "name"), clusterName, errMsg)
-			}
-		case configv1.NutanixIdentifierUUID:
-			if *fd.Cluster.UUID != *mscp.providerSpecValidated.Cluster.UUID {
-				errMsg = fmt.Sprintf("The cluster configured in the providerSpec is not consistent with that configured in the failureDomain %q: %q", fd.Name, *fd.Cluster.UUID)
-				return field.Invalid(fldPath.Child("cluster", "uuid"), *mscp.providerSpecValidated.Cluster.UUID, errMsg)
-			}
-		}
 	}
 
 	return nil
@@ -355,66 +339,43 @@ func validateImageConfig(ctx context.Context, mscp *machineScope, fldPath *field
 	return nil
 }
 
-func validateSubnetConfig(ctx context.Context, mscp *machineScope, subnet *machinev1.NutanixResourceIdentifier, fldPath *field.Path) *field.Error {
+func validateSubnetsConfig(ctx context.Context, mscp *machineScope, fldPath *field.Path) field.ErrorList {
+	fldErrs := field.ErrorList{}
 	var errMsg string
-	var subnetName string
 
-	switch subnet.Type {
-	case machinev1.NutanixIdentifierName:
-		if subnet.Name == nil || *subnet.Name == "" {
-			return field.Required(fldPath.Child("subnet", "name"), "Missing subnet name")
-		} else {
-			subnetName = *subnet.Name
-			subnetRefUuidPtr, err := findSubnetUuidByName(ctx, mscp.nutanixClient, subnetName)
-			if err != nil {
-				errMsg = fmt.Sprintf("Failed to find subnet with name %q. error: %v", subnetName, err)
-				return field.Invalid(fldPath.Child("subnet", "name"), subnetName, errMsg)
+	for i, subnet := range mscp.providerSpecValidated.Subnets {
+		switch subnet.Type {
+		case machinev1.NutanixIdentifierName:
+			if subnet.Name == nil || *subnet.Name == "" {
+				fldErrs = append(fldErrs, field.Required(fldPath.Child("subnet", "name"), "Missing subnet name"))
 			} else {
-				subnet.Type = machinev1.NutanixIdentifierUUID
-				subnet.UUID = subnetRefUuidPtr
+				subnetName := *subnet.Name
+				subnetRefUuidPtr, err := findSubnetUuidByName(ctx, mscp.nutanixClient, subnetName)
+				if err != nil {
+					errMsg = fmt.Sprintf("Failed to find subnet with name %q. error: %v", subnetName, err)
+					fldErrs = append(fldErrs, field.Invalid(fldPath.Child("subnet", "name"), subnetName, errMsg))
+				} else {
+					mscp.providerSpecValidated.Subnets[i].Type = machinev1.NutanixIdentifierUUID
+					mscp.providerSpecValidated.Subnets[i].UUID = subnetRefUuidPtr
+				}
 			}
-		}
-	case machinev1.NutanixIdentifierUUID:
-		if subnet.UUID == nil || *subnet.UUID == "" {
-			return field.Required(fldPath.Child("subnet").Child("uuid"), "Missing subnet uuid")
-		} else {
-			res, err := mscp.nutanixClient.V3.GetSubnet(ctx, *subnet.UUID)
-			if err != nil {
-				errMsg = fmt.Sprintf("Failed to find subnet with uuid %v. error: %v", *subnet.UUID, err)
-				return field.Invalid(fldPath.Child("subnet", "uuid"), *subnet.UUID, errMsg)
+		case machinev1.NutanixIdentifierUUID:
+			if subnet.UUID == nil || *subnet.UUID == "" {
+				fldErrs = append(fldErrs, field.Required(fldPath.Child("subnet").Child("uuid"), "Missing subnet uuid"))
+			} else {
+				_, err := mscp.nutanixClient.V3.GetSubnet(ctx, *subnet.UUID)
+				if err != nil {
+					errMsg = fmt.Sprintf("Failed to find subnet with uuid %v. error: %v", *subnet.UUID, err)
+					fldErrs = append(fldErrs, field.Invalid(fldPath.Child("subnet", "uuid"), *subnet.UUID, errMsg))
+				}
 			}
-			subnetName = *res.Spec.Name
-		}
-	default:
-		errMsg = fmt.Sprintf("Invalid subnet identifier type, valid types are: %q, %q.", configv1.NutanixIdentifierName, configv1.NutanixIdentifierUUID)
-		return field.Invalid(fldPath.Child("subnet", "type"), subnet.Type, errMsg)
-	}
-
-	// If the providerSpec configures the failureDomain reference, validate that the subnets
-	// configuration in both the providerSpec and the referenced failureDomain are consistent.
-	if mscp.failureDomain != nil {
-		if len(mscp.failureDomain.Subnets) != 1 {
-			errMsg = fmt.Sprintf("The failureDomain %q configures %v subnets, and currently only one subnet per failureDomain is supported.", mscp.failureDomain.Name, len(mscp.failureDomain.Subnets))
-			return field.Invalid(fldPath.Child("subnets", "count"), len(mscp.failureDomain.Subnets), errMsg)
-		}
-		fdSubnet := mscp.failureDomain.Subnets[0]
-		switch fdSubnet.Type {
-		case configv1.NutanixIdentifierName:
-			if *fdSubnet.Name != subnetName {
-				errMsg = fmt.Sprintf("The subnets configured in the providerSpec is not consistent with that configured in the failureDomain %q: %q",
-					mscp.failureDomain.Name, *fdSubnet.Name)
-				return field.Invalid(fldPath.Child("subnets", "name"), subnetName, errMsg)
-			}
-		case configv1.NutanixIdentifierUUID:
-			if *fdSubnet.UUID != *subnet.UUID {
-				errMsg = fmt.Sprintf("The subnets configured in the providerSpec is not consistent with that configured in the failureDomain %q: %q",
-					mscp.failureDomain.Name, *fdSubnet.UUID)
-				return field.Invalid(fldPath.Child("subnets", "uuid"), *subnet.UUID, errMsg)
-			}
+		default:
+			errMsg = fmt.Sprintf("Invalid subnet identifier type, valid types are: %q, %q.", configv1.NutanixIdentifierName, configv1.NutanixIdentifierUUID)
+			fldErrs = append(fldErrs, field.Invalid(fldPath.Child("subnet", "type"), subnet.Type, errMsg))
 		}
 	}
 
-	return nil
+	return fldErrs
 }
 
 func validateProjectConfig(ctx context.Context, mscp *machineScope, fldPath *field.Path) *field.Error {
@@ -493,7 +454,7 @@ func createVM(ctx context.Context, mscp *machineScope, userData []byte) (*nutani
 		userdataEncoded := base64.StdEncoding.EncodeToString(userData)
 
 		// Create the VM
-		klog.V(5).Infof("To create VM with name %q, and providerSpec: %+v", vmName, *mscp.providerSpecValidated)
+		klog.V(3).Infof("To create VM with name %q, and providerSpec: %+v", vmName, *mscp.providerSpecValidated)
 		vmInput := nutanixClientV3.VMIntentInput{}
 		vmSpec := nutanixClientV3.VM{Name: utils.StringPtr(vmName)}
 
@@ -641,19 +602,22 @@ func createVM(ctx context.Context, mscp *machineScope, userData []byte) (*nutani
 			klog.Errorf("Failed to create VM %q. error: %v", vmName, err)
 			return nil, err
 		}
-		vmUuid = *vm.Metadata.UUID
-		klog.Infof("Sent the post request to create VM %q. Got the vm UUID: %s, status.state: %s",
-			vmName, vmUuid, *vm.Status.State)
-		// Wait for some time for the VM getting ready
-		time.Sleep(10 * time.Second)
-	}
 
-	//Let's wait to vm's state to become "COMPLETE"
-	err = clientpkg.WaitForGetVMComplete(mscp.nutanixClient, vmUuid)
-	timeElapsed := time.Now().Sub(startTime).String()
-	if err != nil {
-		klog.Errorf("Failed to get the vm %q with UUID %s (time spent: %s). error: %v", vmName, vmUuid, timeElapsed, err)
-		return nil, fmt.Errorf("Error retriving vm %q (uuid: %s). error: %w", vmName, vmUuid, err)
+		if taskUUID, ok := vm.Status.ExecutionContext.TaskUUID.(string); ok {
+			klog.Infof("%s: waiting for the vm creation task to complete, taskUUID: %s.", vmName, taskUUID)
+			if err = waitForTask(mscp.nutanixClient.V3, taskUUID); err != nil {
+				e1 := fmt.Errorf("%s failed to create the vm: %w", vmName, err)
+				klog.Error(e1.Error())
+				return nil, e1
+			}
+		} else {
+			err = fmt.Errorf("failed to convert the vm creation task UUID %v to string", vm.Status.ExecutionContext.TaskUUID)
+			klog.Errorf(err.Error())
+			return nil, err
+		}
+
+		vmUuid = *vm.Metadata.UUID
+		klog.Infof("%s: successfully created the vm. The vm UUID: %s", vmName, vmUuid)
 	}
 
 	vm, err = findVMByUUID(ctx, mscp.nutanixClient, vmUuid)
@@ -661,7 +625,7 @@ func createVM(ctx context.Context, mscp *machineScope, userData []byte) (*nutani
 		klog.Errorf("Failed to find the vm with UUID %s. %v", vmUuid, err)
 		return nil, err
 	}
-	klog.Infof("The vm %q is ready. vmUUID: %s, vmState: %s, time spent: %s", vmName, vmUuid, *vm.Status.State, timeElapsed)
+	klog.Infof("The vm %q is ready. vmUUID: %s, vmState: %s, used_time: %v", vmName, vmUuid, *vm.Status.State, time.Since(startTime).String())
 
 	return vm, nil
 }
