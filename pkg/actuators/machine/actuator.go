@@ -166,9 +166,8 @@ func (a *Actuator) Update(ctx context.Context, machine *machinev1beta1.Machine) 
 	}
 
 	currentResourceVersion := scope.machine.ResourceVersion
-	// Create event only if machine object was modified
 	if previousResourceVersion != currentResourceVersion {
-		a.eventRecorder.Eventf(machine, corev1.EventTypeNormal, updateEventAction, "Updated Machine %v", machine.GetName())
+		klog.Infof("Updated Machine %s: oldResourceVersion=%s, new=%s", machine.GetName(), previousResourceVersion, currentResourceVersion)
 	}
 
 	return nil
