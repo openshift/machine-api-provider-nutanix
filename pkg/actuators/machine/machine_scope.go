@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
+	"slices"
 	"strconv"
 
 	ignutil "github.com/coreos/ignition/v2/config/util"
@@ -287,44 +289,63 @@ func (s *machineScope) setProviderStatus(vm *nutanixClientV3.VMIntentResponse, c
 	// update the Machine providerStatus
 	s.providerStatus.VmUUID = vm.Metadata.UUID
 
-	// update machine.status.addresses
-	machineAddresses := []corev1.NodeAddress{}
-	vmIPEndpoints := make(map[string]bool)
+	// update Addresses
+	s.machine.Status.Addresses = s.buildNodeAddresses(vm)
 
-	for _, nic := range vm.Status.Resources.NicList {
-		for _, ipEndpoint := range nic.IPEndpointList {
-			if ipEndpoint.IP != nil && *ipEndpoint.IP != "" {
-				vmIPEndpoints[*ipEndpoint.IP] = true
-			}
-		}
-	}
-
-	// add the NodeInternalIP addresses to the Machine object using the vm's vmIPEndpoints
-	for ip := range vmIPEndpoints {
-		// add the ip address to the Machine object.
-		machineAddresses = append(machineAddresses, corev1.NodeAddress{
-			Type:    corev1.NodeInternalIP,
-			Address: ip,
-		})
-	}
-
-	// add the NodeInternalDNS and NodeHostName addresses to the Machine object using the vm name
-	vmName := *vm.Spec.Name
-	machineAddresses = append(machineAddresses, corev1.NodeAddress{
-		Type:    corev1.NodeInternalDNS,
-		Address: vmName,
-	})
-	machineAddresses = append(machineAddresses, corev1.NodeAddress{
-		Type:    corev1.NodeHostName,
-		Address: vmName,
-	})
-
-	s.machine.Status.Addresses = machineAddresses
 	klog.V(3).Infof("%s: the machine status.addresses=%+v.", s.machine.Name, s.machine.Status.Addresses)
 
 	s.providerStatus.Conditions = setNutanixProviderConditions([]metav1.Condition{condition}, s.providerStatus.Conditions)
 
 	return nil
+}
+
+// buildNodeAddresses creates NodeAddreses from VM.
+func (s *machineScope) buildNodeAddresses(vm *nutanixClientV3.VMIntentResponse) []corev1.NodeAddress {
+	nodeAddresses := []corev1.NodeAddress{}
+	ips := []string{}
+
+	for _, nic := range vm.Status.Resources.NicList {
+		for _, ipEndpoint := range nic.IPEndpointList {
+			if ipEndpoint.IP != nil && *ipEndpoint.IP != "" {
+				ip := *ipEndpoint.IP
+				if !isLinkLocal(ip) { // Filter out link-local addresses
+					ips = append(ips, ip)
+				}
+			}
+		}
+	}
+
+	slices.Sort(ips)
+
+	for _, ip := range ips {
+		nodeAddresses = append(nodeAddresses, corev1.NodeAddress{
+			Type:    corev1.NodeInternalIP,
+			Address: ip,
+		})
+	}
+
+	vmName := *vm.Spec.Name
+	nodeAddresses = append(nodeAddresses,
+		corev1.NodeAddress{Type: corev1.NodeInternalDNS, Address: vmName},
+		corev1.NodeAddress{Type: corev1.NodeHostName, Address: vmName},
+	)
+
+	return nodeAddresses
+}
+
+// isLinkLocal checks if the address is in the link-local IP range.
+func isLinkLocal(ip string) bool {
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		return false // Invalid IP address
+	}
+
+	linkLocalSubnet := &net.IPNet{
+		IP:   net.IPv4(169, 254, 0, 0),
+		Mask: net.CIDRMask(16, 32),
+	}
+
+	return linkLocalSubnet.Contains(parsedIP)
 }
 
 func (s *machineScope) isNodeLinked() bool {
