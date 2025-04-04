@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+## [v0.5.1] - 2024-08-09
+### Changed
+- Updated the v3 Subnet spec struct to match latest swagger spec
+
+## [v0.5.0] - 2024-07-29
+### Added
+- Added v4 Categories beta APIs to v4 client
+- Added v4 VolumeGroups beta APIs to v4 client
+- Added a cache for v4 clients in v4 package
+
+### Changed
+- Updated v4 API clients from v4 alpha to v4 beta  APIs
+- Handle trust bundle in v4 client cache GetOrCreate by setting VerifySSL
+
 ## [0.4.0] - 2024-05-03
 ### Added
 - Added support for v4 client creation.
