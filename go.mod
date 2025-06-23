@@ -1,8 +1,8 @@
 module github.com/openshift/machine-api-provider-nutanix
 
-go 1.23.0
+go 1.21
 
-toolchain go1.24.2
+toolchain go1.21.3
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
@@ -102,7 +102,7 @@ require (
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/net v0.33.0 // indirect; Fixes CVE-2024-45338
-	golang.org/x/oauth2 v0.27.0 // indirect
+	golang.org/x/oauth2 v0.12.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/term v0.27.0 // indirect
