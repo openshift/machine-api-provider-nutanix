@@ -388,8 +388,8 @@ github.com/onsi/ginkgo/v2 v2.22.2 h1:/3X8Panh8/WwhU/3Ssa6rCKqPLuAkVY2I0RoyDLySlU
 github.com/onsi/ginkgo/v2 v2.22.2/go.mod h1:oeMosUL+8LtarXBHu/c0bx2D/K9zyQ6uX3cTyztHwsk=
 github.com/onsi/gomega v1.36.2 h1:koNYke6TVk6ZmnyHrCXba/T/MoLBXFjeC1PtvYgw0A8=
 github.com/onsi/gomega v1.36.2/go.mod h1:DdwyADRjrc825LhMEkD76cHR5+pUnjhUN8GlHlRPHzY=
-github.com/openshift/api v0.0.0-20250305122440-3e04d3af8c3e h1:bEcCutNr5RLU/DudWNs/nlOLBqMxrfsHtVuMttkxvWE=
-github.com/openshift/api v0.0.0-20250305122440-3e04d3af8c3e/go.mod h1:yk60tHAmHhtVpJQo3TwVYq2zpuP70iJIFDCmeKMIzPw=
+github.com/openshift/api v0.0.0-20250528100135-a463917701ab h1:99AhxDrrz2M4llF0eYOCv7NMowALSzp97UN3I5MKGlo=
+github.com/openshift/api v0.0.0-20250528100135-a463917701ab/go.mod h1:yk60tHAmHhtVpJQo3TwVYq2zpuP70iJIFDCmeKMIzPw=
 github.com/openshift/client-go v0.0.0-20250131180035-f7ec47e2d87a h1:duO3JMrUOqVx50QhzxvDeOYIwTNOB8/EEuRLPyvAMBg=
 github.com/openshift/client-go v0.0.0-20250131180035-f7ec47e2d87a/go.mod h1:Qw3ThpzVZ0bfTILpBNYg4LGyjtNxfyCiGh/uDLOOTP8=
 github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20250122171707-86066d47a264 h1:KoJiId8Ynajf/ZFodvmayFkDODIL7Vow3LmgR5+oVRg=
@@ -398,8 +398,8 @@ github.com/openshift/cluster-control-plane-machine-set-operator v0.0.0-202501281
 github.com/openshift/cluster-control-plane-machine-set-operator v0.0.0-20250128131205-c7b3d7b57a8e/go.mod h1:ae3TvkWGFUuKQAnypbtiVMXxBlRfJGbf37z5zVh98uA=
 github.com/openshift/library-go v0.0.0-20250129210218-fe56c2cf5d70 h1:VLj8CU9q009xlMuR4wNcqDX4lVa2Ji3u/iYnBLHtQUc=
 github.com/openshift/library-go v0.0.0-20250129210218-fe56c2cf5d70/go.mod h1:TQx0VEhZ/92qRXIMDu2Wg4bUPmw5HRNE6wpSZ+IsP0Y=
-github.com/openshift/machine-api-operator v0.2.1-0.20250331230956-c6b86e48e8fd h1:HufFexLI7SOehjaVrp4qc40QdC+qACSmi2AZPKWF19s=
-github.com/openshift/machine-api-operator v0.2.1-0.20250331230956-c6b86e48e8fd/go.mod h1:PhLx4BqZpa0hHrB/lVUYgnlQ5ut/3RElWAA6Cjc0wIA=
+github.com/openshift/machine-api-operator v0.2.1-0.20250704070513-81d86b5a1ef5 h1:qE46shcZY9nOnah14lQOPWduvWYrXIVpCnDoH4IMt0o=
+github.com/openshift/machine-api-operator v0.2.1-0.20250704070513-81d86b5a1ef5/go.mod h1:1fnQ4CMfwvkLTRafNW3aSC/9w73vbYW6h4ogM0sALgw=
 github.com/pelletier/go-toml/v2 v2.2.3 h1:YmeHyLY8mFWbdkNWwpr+qIL2bEqT0o95WSdkNHvL12M=
 github.com/pelletier/go-toml/v2 v2.2.3/go.mod h1:MfCQTFTvCcUyyvvwm1+G6H/jORL20Xlb6rzQu9GuUkc=
 github.com/peterbourgon/diskv v2.0.1+incompatible h1:UBdAOUP5p4RWqPBg048CAvpKN+vxiaj6gdUUzhl4XmI=
