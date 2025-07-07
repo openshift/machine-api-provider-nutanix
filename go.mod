@@ -10,9 +10,9 @@ require (
 	github.com/nutanix-cloud-native/prism-go-client v0.5.1
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
-	github.com/openshift/api v0.0.0-20250305122440-3e04d3af8c3e
+	github.com/openshift/api v0.0.0-20250528100135-a463917701ab
 	github.com/openshift/library-go v0.0.0-20250129210218-fe56c2cf5d70
-	github.com/openshift/machine-api-operator v0.2.1-0.20250331230956-c6b86e48e8fd
+	github.com/openshift/machine-api-operator v0.2.1-0.20250704070513-81d86b5a1ef5
 	github.com/vincent-petithory/dataurl v1.0.0
 	k8s.io/api v0.32.2
 	k8s.io/apimachinery v0.32.2
