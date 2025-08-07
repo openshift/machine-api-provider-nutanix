@@ -612,7 +612,7 @@ func createVM(ctx context.Context, mscp *machineScope, userData []byte) (*nutani
 			}
 		} else {
 			err = fmt.Errorf("failed to convert the vm creation task UUID %v to string", vm.Status.ExecutionContext.TaskUUID)
-			klog.Errorf(err.Error())
+			klog.Errorf("%s", err.Error())
 			return nil, err
 		}
 
@@ -652,17 +652,17 @@ func findVMByName(ctx context.Context, ntnxclient *nutanixClientV3.Client, vmNam
 
 	if err != nil {
 		err = fmt.Errorf("Error when finding VM by name %s. error: %w", vmName, err)
-		klog.Errorf(err.Error())
+		klog.Errorf("%s", err.Error())
 		return nil, err
 	}
 	if len(res.Entities) == 0 {
 		err = fmt.Errorf("Not Found VM by name %q. error: VM_NOT_FOUND", vmName)
-		klog.Errorf(err.Error())
+		klog.Errorf("%s", err.Error())
 		return nil, err
 	}
 	if len(res.Entities) > 1 {
 		err = fmt.Errorf("Found more than one (%v) vms with name %s.", len(res.Entities), vmName)
-		klog.Errorf(err.Error())
+		klog.Errorf("%s", err.Error())
 		return nil, err
 	}
 
@@ -739,13 +739,13 @@ func findImageUuidByName(ctx context.Context, ntnxclient *nutanixClientV3.Client
 	})
 	if err != nil || len(res.Entities) == 0 {
 		e1 := fmt.Errorf("Failed to find image by name %q. error: %w", imageName, err)
-		klog.Errorf(e1.Error())
+		klog.Errorf("%s", e1.Error())
 		return nil, e1
 	}
 
 	if len(res.Entities) > 1 {
 		err = fmt.Errorf("Found more than one (%v) images with name %q.", len(res.Entities), imageName)
-		klog.Errorf(err.Error())
+		klog.Errorf("%s", err.Error())
 		return nil, err
 	}
 
@@ -762,13 +762,13 @@ func findSubnetUuidByName(ctx context.Context, ntnxclient *nutanixClientV3.Clien
 	})
 	if err != nil || len(res.Entities) == 0 {
 		e1 := fmt.Errorf("Failed to find subnet by name %q. error: %w", subnetName, err)
-		klog.Errorf(e1.Error())
+		klog.Errorf("%s", e1.Error())
 		return nil, e1
 	}
 
 	if len(res.Entities) > 1 {
 		err = fmt.Errorf("Found more than one (%v) subnets with name %q.", len(res.Entities), subnetName)
-		klog.Errorf(err.Error())
+		klog.Errorf("%s", err.Error())
 		return nil, err
 	}
 
@@ -784,13 +784,13 @@ func findProjectUuidByName(ctx context.Context, ntnxclient *nutanixClientV3.Clie
 	})
 	if err != nil || len(res.Entities) == 0 {
 		e1 := fmt.Errorf("Failed to find project by name %q. error: %w", projectName, err)
-		klog.Errorf(e1.Error())
+		klog.Errorf("%s", e1.Error())
 		return nil, e1
 	}
 
 	if len(res.Entities) > 1 {
 		err = fmt.Errorf("Found more than one (%v) projects with name %q.", len(res.Entities), projectName)
-		klog.Errorf(err.Error())
+		klog.Errorf("%s", err.Error())
 		return nil, err
 	}
 

@@ -181,7 +181,7 @@ func setClientCredentials(credsData []byte, clientOptions *clientpkg.ClientOptio
 	err := json.Unmarshal(credsData, &creds.Credentials)
 	if err != nil {
 		err1 := fmt.Errorf("Failed to unmarshal the credentials data. %w", err)
-		klog.Errorf(err1.Error())
+		klog.Errorf("%s", err1.Error())
 		return err1
 	}
 
