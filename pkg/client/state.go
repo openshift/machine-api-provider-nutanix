@@ -77,7 +77,7 @@ func waitUntilVMStateFunc(conn *nutanixClientV3.Client, uuid string) stateRefres
 		klog.V(5).Infof("Read Response %v", *resp.Status.State)
 
 		if *resp.Status.State == "ERROR" {
-			return "error", fmt.Errorf(GetMessageListString(resp.Status.MessageList))
+			return "error", fmt.Errorf("%s", GetMessageListString(resp.Status.MessageList))
 		}
 
 		if *resp.Status.State != "COMPLETE" {
@@ -109,7 +109,7 @@ func waitUntilSubnetStateFunc(conn *nutanixClientV3.Client, uuid string) stateRe
 		klog.V(5).Infof("Read Response %v", *resp.Status.State)
 
 		if *resp.Status.State == "ERROR" {
-			return "error", fmt.Errorf(GetMessageListString(resp.Status.MessageList))
+			return "error", fmt.Errorf("%s", GetMessageListString(resp.Status.MessageList))
 		}
 
 		if *resp.Status.State != "COMPLETE" {

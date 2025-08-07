@@ -15,18 +15,18 @@ all: help
 ## Build:
 build: ## Build your project and put the output binary in bin/
 	mkdir -p bin
-	$(GOCMD) build -o bin/$(BINARY_NAME) .
+	go build ./...
 
 # CRD_OPTIONS define options to add to the CONTROLLER_GEN
 CRD_OPTIONS ?= "crd:crdVersions=v1"
 
 .PHONY: run-keploy
 run-keploy:
-	server run &
+	keploy-server run &
 
 .PHONY: stop-keploy
 stop-keploy:
-	@-pkill "server"
+	@-pkill "keploy-server"
 
 generate: $(CONTROLLER_GEN)  ## Generate zz_generated.deepcopy.go
 	controller-gen paths="./..." object:headerFile="hack/boilerplate.go.txt"
@@ -55,11 +55,21 @@ generate-v3-models: ## Generate V3 models using go-swagger
 		--model=vpc_reference \
 		--model=dhcp_options \
 		--model=address \
-		--model=ip_pool
+		--model=ip_pool \
+		--model=idempotence_identifiers_input \
+		--model=idempotence_identifiers_metadata \
+		--model=idempotence_identifiers_response \
+		--model=idempotence_identifiers_status \
+		--model=user_reference \
+		--model=project_reference \
+		--model=api_version \
+		--model=message_resource
 
 clean: ## Remove build related file
 	rm -fr ./bin vendor hack/tools/bin
 	rm -f checkstyle-report.xml ./coverage.out ./profile.cov yamllint-checkstyle.xml
+
+GOTESTPKGS = $(shell go list ./... | grep -v /v3/models)
 
 ## Test:
 test: run-keploy ## Run the tests of the project
@@ -67,14 +77,13 @@ test: run-keploy ## Run the tests of the project
 	@$(MAKE) stop-keploy
 
 coverage: run-keploy ## Run the tests of the project and export the coverage
-	go test -race -coverprofile=coverage.out -covermode=atomic ./...
+	go test -race -coverprofile=coverage.out -covermode=atomic $(GOTESTPKGS)
 	@$(MAKE) stop-keploy
 
 ## Lint:
 lint: lint-go lint-yaml lint-kubebuilder ## Run all available linters
 
 lint-go: ## Use golintci-lint on your project
-	$(eval OUTPUT_OPTIONS = $(shell [ "${EXPORT_RESULT}" == "true" ] && echo "--out-format checkstyle ./... | tee /dev/tty > checkstyle-report.xml" || echo "" ))
 	golangci-lint run -v
 
 lint-yaml: ## Use yamllint on the yaml file of your projects
