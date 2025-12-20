@@ -6,7 +6,6 @@ require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/coreos/ignition/v2 v2.24.0
 	github.com/go-logr/logr v1.4.3
-	github.com/golang/mock v1.6.0
 	github.com/nutanix-cloud-native/prism-go-client v0.5.4
 	github.com/onsi/ginkgo/v2 v2.27.2
 	github.com/onsi/gomega v1.38.2
@@ -14,6 +13,7 @@ require (
 	github.com/openshift/library-go v0.0.0-20251107090138-0de9712313a5
 	github.com/openshift/machine-api-operator v0.2.1-0.20251110092458-e0af0f3f44b8
 	github.com/vincent-petithory/dataurl v1.0.0
+	go.uber.org/mock v0.6.0
 	k8s.io/api v0.34.1
 	k8s.io/apimachinery v0.34.1
 	k8s.io/apiserver v0.34.1
