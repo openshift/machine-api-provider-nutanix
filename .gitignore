@@ -16,3 +16,6 @@ bin
 test/integration/.terraform*
 test/integration/manifests/aws-credentials.yaml
 test/integration/terraform.*
+
+# vendor
+!vendor/github.com/go-errors/errors/cover.out
