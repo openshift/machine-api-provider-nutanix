@@ -1,6 +1,6 @@
 module github.com/openshift/machine-api-provider-nutanix
 
-go 1.24.0
+go 1.24.12 // CVE-2025-61726: DoS via net/url query parameter exhaustion; fixed in 1.24.12
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
