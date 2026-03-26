@@ -33,9 +33,9 @@ REPO_PATH   ?= github.com/openshift/machine-api-provider-nutanix
 LD_FLAGS    ?= -X $(REPO_PATH)/pkg/version.Raw=$(VERSION) -extldflags "-static"
 MUTABLE_TAG ?= latest
 IMAGE        = public.ecr.aws/g7v6l0u0/openshift/mapi-provider-nutanix
-BUILD_IMAGE ?= registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+BUILD_IMAGE ?= registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.34.1
+ENVTEST_K8S_VERSION = 1.35.1
 
 # race tests need CGO_ENABLED, everything else should have it disabled
 CGO_ENABLED = 0
