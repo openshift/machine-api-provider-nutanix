@@ -17,6 +17,136 @@ github.com/PaesslerAG/jsonpath
 # github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
 ## explicit; go 1.13
 github.com/asaskevich/govalidator
+# github.com/aws/aws-sdk-go-v2 v1.41.1
+## explicit; go 1.23
+github.com/aws/aws-sdk-go-v2/aws
+github.com/aws/aws-sdk-go-v2/aws/arn
+github.com/aws/aws-sdk-go-v2/aws/defaults
+github.com/aws/aws-sdk-go-v2/aws/middleware
+github.com/aws/aws-sdk-go-v2/aws/protocol/query
+github.com/aws/aws-sdk-go-v2/aws/protocol/restjson
+github.com/aws/aws-sdk-go-v2/aws/protocol/xml
+github.com/aws/aws-sdk-go-v2/aws/ratelimit
+github.com/aws/aws-sdk-go-v2/aws/retry
+github.com/aws/aws-sdk-go-v2/aws/signer/internal/v4
+github.com/aws/aws-sdk-go-v2/aws/signer/v4
+github.com/aws/aws-sdk-go-v2/aws/transport/http
+github.com/aws/aws-sdk-go-v2/internal/auth
+github.com/aws/aws-sdk-go-v2/internal/auth/smithy
+github.com/aws/aws-sdk-go-v2/internal/awsutil
+github.com/aws/aws-sdk-go-v2/internal/context
+github.com/aws/aws-sdk-go-v2/internal/endpoints
+github.com/aws/aws-sdk-go-v2/internal/endpoints/awsrulesfn
+github.com/aws/aws-sdk-go-v2/internal/middleware
+github.com/aws/aws-sdk-go-v2/internal/rand
+github.com/aws/aws-sdk-go-v2/internal/sdk
+github.com/aws/aws-sdk-go-v2/internal/sdkio
+github.com/aws/aws-sdk-go-v2/internal/shareddefaults
+github.com/aws/aws-sdk-go-v2/internal/strings
+github.com/aws/aws-sdk-go-v2/internal/sync/singleflight
+github.com/aws/aws-sdk-go-v2/internal/timeconv
+# github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.1
+## explicit; go 1.22
+github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream
+github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream/eventstreamapi
+# github.com/aws/aws-sdk-go-v2/config v1.31.12
+## explicit; go 1.22
+github.com/aws/aws-sdk-go-v2/config
+# github.com/aws/aws-sdk-go-v2/credentials v1.18.16
+## explicit; go 1.22
+github.com/aws/aws-sdk-go-v2/credentials
+github.com/aws/aws-sdk-go-v2/credentials/ec2rolecreds
+github.com/aws/aws-sdk-go-v2/credentials/endpointcreds
+github.com/aws/aws-sdk-go-v2/credentials/endpointcreds/internal/client
+github.com/aws/aws-sdk-go-v2/credentials/processcreds
+github.com/aws/aws-sdk-go-v2/credentials/ssocreds
+github.com/aws/aws-sdk-go-v2/credentials/stscreds
+# github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.9
+## explicit; go 1.22
+github.com/aws/aws-sdk-go-v2/feature/ec2/imds
+github.com/aws/aws-sdk-go-v2/feature/ec2/imds/internal/config
+# github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.19.12
+## explicit; go 1.22
+github.com/aws/aws-sdk-go-v2/feature/s3/manager
+# github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.9
+## explicit; go 1.22
+github.com/aws/aws-sdk-go-v2/internal/configsources
+# github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.9
+## explicit; go 1.22
+github.com/aws/aws-sdk-go-v2/internal/endpoints/v2
+# github.com/aws/aws-sdk-go-v2/internal/ini v1.8.3
+## explicit; go 1.22
+github.com/aws/aws-sdk-go-v2/internal/ini
+# github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.9
+## explicit; go 1.22
+github.com/aws/aws-sdk-go-v2/internal/v4a
+github.com/aws/aws-sdk-go-v2/internal/v4a/internal/crypto
+github.com/aws/aws-sdk-go-v2/internal/v4a/internal/v4
+# github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.1
+## explicit; go 1.22
+github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding
+# github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.9.0
+## explicit; go 1.22
+github.com/aws/aws-sdk-go-v2/service/internal/checksum
+# github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.9
+## explicit; go 1.22
+github.com/aws/aws-sdk-go-v2/service/internal/presigned-url
+# github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.9
+## explicit; go 1.22
+github.com/aws/aws-sdk-go-v2/service/internal/s3shared
+github.com/aws/aws-sdk-go-v2/service/internal/s3shared/arn
+github.com/aws/aws-sdk-go-v2/service/internal/s3shared/config
+# github.com/aws/aws-sdk-go-v2/service/s3 v1.88.4
+## explicit; go 1.22
+github.com/aws/aws-sdk-go-v2/service/s3
+github.com/aws/aws-sdk-go-v2/service/s3/internal/arn
+github.com/aws/aws-sdk-go-v2/service/s3/internal/customizations
+github.com/aws/aws-sdk-go-v2/service/s3/internal/endpoints
+github.com/aws/aws-sdk-go-v2/service/s3/types
+# github.com/aws/aws-sdk-go-v2/service/sso v1.29.6
+## explicit; go 1.22
+github.com/aws/aws-sdk-go-v2/service/sso
+github.com/aws/aws-sdk-go-v2/service/sso/internal/endpoints
+github.com/aws/aws-sdk-go-v2/service/sso/types
+# github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.1
+## explicit; go 1.22
+github.com/aws/aws-sdk-go-v2/service/ssooidc
+github.com/aws/aws-sdk-go-v2/service/ssooidc/internal/endpoints
+github.com/aws/aws-sdk-go-v2/service/ssooidc/types
+# github.com/aws/aws-sdk-go-v2/service/sts v1.38.6
+## explicit; go 1.22
+github.com/aws/aws-sdk-go-v2/service/sts
+github.com/aws/aws-sdk-go-v2/service/sts/internal/endpoints
+github.com/aws/aws-sdk-go-v2/service/sts/types
+# github.com/aws/smithy-go v1.24.0
+## explicit; go 1.23
+github.com/aws/smithy-go
+github.com/aws/smithy-go/auth
+github.com/aws/smithy-go/auth/bearer
+github.com/aws/smithy-go/container/private/cache
+github.com/aws/smithy-go/container/private/cache/lru
+github.com/aws/smithy-go/context
+github.com/aws/smithy-go/document
+github.com/aws/smithy-go/encoding
+github.com/aws/smithy-go/encoding/httpbinding
+github.com/aws/smithy-go/encoding/json
+github.com/aws/smithy-go/encoding/xml
+github.com/aws/smithy-go/endpoints
+github.com/aws/smithy-go/endpoints/private/rulesfn
+github.com/aws/smithy-go/internal/sync/singleflight
+github.com/aws/smithy-go/io
+github.com/aws/smithy-go/logging
+github.com/aws/smithy-go/metrics
+github.com/aws/smithy-go/middleware
+github.com/aws/smithy-go/private/requestcompression
+github.com/aws/smithy-go/ptr
+github.com/aws/smithy-go/rand
+github.com/aws/smithy-go/sync
+github.com/aws/smithy-go/time
+github.com/aws/smithy-go/tracing
+github.com/aws/smithy-go/transport/http
+github.com/aws/smithy-go/transport/http/internal/io
+github.com/aws/smithy-go/waiter
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
@@ -161,6 +291,9 @@ github.com/gregjones/httpcache
 # github.com/hashicorp/go-cleanhttp v0.5.2
 ## explicit; go 1.13
 github.com/hashicorp/go-cleanhttp
+# github.com/hashicorp/go-retryablehttp v0.7.7
+## explicit; go 1.19
+github.com/hashicorp/go-retryablehttp
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
@@ -206,19 +339,99 @@ github.com/monochromegane/go-gitignore
 # github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 ## explicit
 github.com/munnerz/goautoneg
-# github.com/nutanix-cloud-native/prism-go-client v0.5.4
-## explicit; go 1.21
+# github.com/nutanix-cloud-native/prism-go-client v0.7.0
+## explicit; go 1.24.0
 github.com/nutanix-cloud-native/prism-go-client
+github.com/nutanix-cloud-native/prism-go-client/converged
+github.com/nutanix-cloud-native/prism-go-client/converged/v4
 github.com/nutanix-cloud-native/prism-go-client/environment/types
 github.com/nutanix-cloud-native/prism-go-client/internal
-github.com/nutanix-cloud-native/prism-go-client/utils
 github.com/nutanix-cloud-native/prism-go-client/v3
 github.com/nutanix-cloud-native/prism-go-client/v3/models
+github.com/nutanix-cloud-native/prism-go-client/v4
+# github.com/nutanix/ntnx-api-golang-clients/clustermgmt-go-client/v4 v4.2.1
+## explicit; go 1.17
+github.com/nutanix/ntnx-api-golang-clients/clustermgmt-go-client/v4/api
+github.com/nutanix/ntnx-api-golang-clients/clustermgmt-go-client/v4/client
+github.com/nutanix/ntnx-api-golang-clients/clustermgmt-go-client/v4/models/clustermgmt/v4/ahv/config
+github.com/nutanix/ntnx-api-golang-clients/clustermgmt-go-client/v4/models/clustermgmt/v4/config
+github.com/nutanix/ntnx-api-golang-clients/clustermgmt-go-client/v4/models/clustermgmt/v4/error
+github.com/nutanix/ntnx-api-golang-clients/clustermgmt-go-client/v4/models/clustermgmt/v4/operations
+github.com/nutanix/ntnx-api-golang-clients/clustermgmt-go-client/v4/models/clustermgmt/v4/stats
+github.com/nutanix/ntnx-api-golang-clients/clustermgmt-go-client/v4/models/common/v1/config
+github.com/nutanix/ntnx-api-golang-clients/clustermgmt-go-client/v4/models/common/v1/response
+github.com/nutanix/ntnx-api-golang-clients/clustermgmt-go-client/v4/models/common/v1/stats
+github.com/nutanix/ntnx-api-golang-clients/clustermgmt-go-client/v4/models/networking/v4/aws/config
+github.com/nutanix/ntnx-api-golang-clients/clustermgmt-go-client/v4/models/prism/v4/config
+# github.com/nutanix/ntnx-api-golang-clients/iam-go-client/v4 v4.0.1
+## explicit; go 1.17
+github.com/nutanix/ntnx-api-golang-clients/iam-go-client/v4/api
+github.com/nutanix/ntnx-api-golang-clients/iam-go-client/v4/client
+github.com/nutanix/ntnx-api-golang-clients/iam-go-client/v4/models/common/v1/config
+github.com/nutanix/ntnx-api-golang-clients/iam-go-client/v4/models/common/v1/response
+github.com/nutanix/ntnx-api-golang-clients/iam-go-client/v4/models/iam/v4/authn
+github.com/nutanix/ntnx-api-golang-clients/iam-go-client/v4/models/iam/v4/authz
+github.com/nutanix/ntnx-api-golang-clients/iam-go-client/v4/models/iam/v4/error
+# github.com/nutanix/ntnx-api-golang-clients/networking-go-client/v4 v4.2.1
+## explicit; go 1.17
+github.com/nutanix/ntnx-api-golang-clients/networking-go-client/v4/api
+github.com/nutanix/ntnx-api-golang-clients/networking-go-client/v4/client
+github.com/nutanix/ntnx-api-golang-clients/networking-go-client/v4/models/common/v1/config
+github.com/nutanix/ntnx-api-golang-clients/networking-go-client/v4/models/common/v1/response
+github.com/nutanix/ntnx-api-golang-clients/networking-go-client/v4/models/common/v1/stats
+github.com/nutanix/ntnx-api-golang-clients/networking-go-client/v4/models/networking/v4/aws/config
+github.com/nutanix/ntnx-api-golang-clients/networking-go-client/v4/models/networking/v4/config
+github.com/nutanix/ntnx-api-golang-clients/networking-go-client/v4/models/networking/v4/error
+github.com/nutanix/ntnx-api-golang-clients/networking-go-client/v4/models/networking/v4/stats
+github.com/nutanix/ntnx-api-golang-clients/networking-go-client/v4/models/prism/v4/config
+# github.com/nutanix/ntnx-api-golang-clients/prism-go-client/v4 v4.2.1
+## explicit; go 1.17
+github.com/nutanix/ntnx-api-golang-clients/prism-go-client/v4/api
+github.com/nutanix/ntnx-api-golang-clients/prism-go-client/v4/client
+github.com/nutanix/ntnx-api-golang-clients/prism-go-client/v4/models/clustermgmt/v4/config
+github.com/nutanix/ntnx-api-golang-clients/prism-go-client/v4/models/common/v1/config
+github.com/nutanix/ntnx-api-golang-clients/prism-go-client/v4/models/common/v1/response
+github.com/nutanix/ntnx-api-golang-clients/prism-go-client/v4/models/prism/v4/config
+github.com/nutanix/ntnx-api-golang-clients/prism-go-client/v4/models/prism/v4/error
+github.com/nutanix/ntnx-api-golang-clients/prism-go-client/v4/models/prism/v4/management
+github.com/nutanix/ntnx-api-golang-clients/prism-go-client/v4/models/prism/v4/operations
+github.com/nutanix/ntnx-api-golang-clients/prism-go-client/v4/models/vmm/v4/ahv/config
+# github.com/nutanix/ntnx-api-golang-clients/vmm-go-client/v4 v4.2.1
+## explicit; go 1.17
+github.com/nutanix/ntnx-api-golang-clients/vmm-go-client/v4/api
+github.com/nutanix/ntnx-api-golang-clients/vmm-go-client/v4/client
+github.com/nutanix/ntnx-api-golang-clients/vmm-go-client/v4/models/catalogCommon/v1/config
+github.com/nutanix/ntnx-api-golang-clients/vmm-go-client/v4/models/common/v1/config
+github.com/nutanix/ntnx-api-golang-clients/vmm-go-client/v4/models/common/v1/response
+github.com/nutanix/ntnx-api-golang-clients/vmm-go-client/v4/models/common/v1/stats
+github.com/nutanix/ntnx-api-golang-clients/vmm-go-client/v4/models/dataprotection/v4/common
+github.com/nutanix/ntnx-api-golang-clients/vmm-go-client/v4/models/iam/v4/authn
+github.com/nutanix/ntnx-api-golang-clients/vmm-go-client/v4/models/prism/v4/config
+github.com/nutanix/ntnx-api-golang-clients/vmm-go-client/v4/models/vmm/v4/ahv/config
+github.com/nutanix/ntnx-api-golang-clients/vmm-go-client/v4/models/vmm/v4/ahv/policies
+github.com/nutanix/ntnx-api-golang-clients/vmm-go-client/v4/models/vmm/v4/ahv/stats
+github.com/nutanix/ntnx-api-golang-clients/vmm-go-client/v4/models/vmm/v4/config
+github.com/nutanix/ntnx-api-golang-clients/vmm-go-client/v4/models/vmm/v4/content
+github.com/nutanix/ntnx-api-golang-clients/vmm-go-client/v4/models/vmm/v4/error
+github.com/nutanix/ntnx-api-golang-clients/vmm-go-client/v4/models/vmm/v4/esxi/config
+github.com/nutanix/ntnx-api-golang-clients/vmm-go-client/v4/models/vmm/v4/esxi/stats
+github.com/nutanix/ntnx-api-golang-clients/vmm-go-client/v4/models/vmm/v4/images/config
+# github.com/nutanix/ntnx-api-golang-clients/volumes-go-client/v4 v4.2.1
+## explicit; go 1.17
+github.com/nutanix/ntnx-api-golang-clients/volumes-go-client/v4/api
+github.com/nutanix/ntnx-api-golang-clients/volumes-go-client/v4/client
+github.com/nutanix/ntnx-api-golang-clients/volumes-go-client/v4/models/common/v1/config
+github.com/nutanix/ntnx-api-golang-clients/volumes-go-client/v4/models/common/v1/response
+github.com/nutanix/ntnx-api-golang-clients/volumes-go-client/v4/models/common/v1/stats
+github.com/nutanix/ntnx-api-golang-clients/volumes-go-client/v4/models/prism/v4/config
+github.com/nutanix/ntnx-api-golang-clients/volumes-go-client/v4/models/volumes/v4/config
+github.com/nutanix/ntnx-api-golang-clients/volumes-go-client/v4/models/volumes/v4/error
+github.com/nutanix/ntnx-api-golang-clients/volumes-go-client/v4/models/volumes/v4/stats
 # github.com/oklog/ulid v1.3.1
 ## explicit
 github.com/oklog/ulid
-# github.com/onsi/ginkgo/v2 v2.28.1
-## explicit; go 1.24.0
+# github.com/onsi/ginkgo/v2 v2.27.3
+## explicit; go 1.23.0
 github.com/onsi/ginkgo/v2
 github.com/onsi/ginkgo/v2/config
 github.com/onsi/ginkgo/v2/formatter
@@ -241,7 +454,7 @@ github.com/onsi/ginkgo/v2/internal/reporters
 github.com/onsi/ginkgo/v2/internal/testingtproxy
 github.com/onsi/ginkgo/v2/reporters
 github.com/onsi/ginkgo/v2/types
-# github.com/onsi/gomega v1.39.0
+# github.com/onsi/gomega v1.38.3
 ## explicit; go 1.23.0
 github.com/onsi/gomega
 github.com/onsi/gomega/format
@@ -321,6 +534,9 @@ github.com/prometheus/procfs/internal/util
 # github.com/russross/blackfriday/v2 v2.1.0
 ## explicit
 github.com/russross/blackfriday/v2
+# github.com/sirupsen/logrus v1.9.3
+## explicit; go 1.13
+github.com/sirupsen/logrus
 # github.com/spf13/afero v1.12.0
 ## explicit; go 1.21
 github.com/spf13/afero
