@@ -1,12 +1,12 @@
 package machine
 
 import (
-	"github.com/nutanix-cloud-native/prism-go-client/utils"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -106,8 +106,8 @@ func getInfrastructureObject(withFailureDomains bool) *configv1.Infrastructure {
 func getValidProviderSpec(fdName string) *machinev1.NutanixMachineProviderConfig {
 
 	return &machinev1.NutanixMachineProviderConfig{
-		Cluster: machinev1.NutanixResourceIdentifier{Type: "name", Name: utils.StringPtr("test-pe")},
-		Image:   machinev1.NutanixResourceIdentifier{Type: "name", Name: utils.StringPtr("rhcos-4.10-nutanix")},
+		Cluster: machinev1.NutanixResourceIdentifier{Type: "name", Name: ptr.To("test-pe")},
+		Image:   machinev1.NutanixResourceIdentifier{Type: "name", Name: ptr.To("rhcos-4.10-nutanix")},
 		Subnets: []machinev1.NutanixResourceIdentifier{
 			{Type: "name", Name: Ptr[string]("test_net")},
 		},

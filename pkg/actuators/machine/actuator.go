@@ -40,24 +40,21 @@ const (
 
 // Actuator is responsible for performing machine reconciliation.
 type Actuator struct {
-	client              runtimeclient.Client
-	eventRecorder       record.EventRecorder
-	configManagedClient runtimeclient.Client
+	client        runtimeclient.Client
+	eventRecorder record.EventRecorder
 }
 
 // ActuatorParams holds parameter information for Actuator.
 type ActuatorParams struct {
-	Client              runtimeclient.Client
-	EventRecorder       record.EventRecorder
-	ConfigManagedClient runtimeclient.Client
+	Client        runtimeclient.Client
+	EventRecorder record.EventRecorder
 }
 
 // NewActuator returns an actuator.
 func NewActuator(params ActuatorParams) *Actuator {
 	return &Actuator{
-		client:              params.Client,
-		eventRecorder:       params.EventRecorder,
-		configManagedClient: params.ConfigManagedClient,
+		client:        params.Client,
+		eventRecorder: params.EventRecorder,
 	}
 }
 
@@ -76,10 +73,9 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1beta1.Machine) 
 	klog.Infof("%s: actuator creating machine", machine.GetName())
 
 	scope, err := newMachineScope(machineScopeParams{
-		Context:             ctx,
-		client:              a.client,
-		machine:             machine,
-		configManagedClient: a.configManagedClient,
+		Context: ctx,
+		client:  a.client,
+		machine: machine,
 	})
 	if err != nil {
 		fmtErr := fmt.Errorf(scopeFailFmt, machine.GetName(), err)
@@ -114,10 +110,9 @@ func (a *Actuator) Exists(ctx context.Context, machine *machinev1beta1.Machine) 
 	klog.Infof("%s: actuator checking if machine exists", machine.GetName())
 
 	scope, err := newMachineScope(machineScopeParams{
-		Context:             ctx,
-		client:              a.client,
-		machine:             machine,
-		configManagedClient: a.configManagedClient,
+		Context: ctx,
+		client:  a.client,
+		machine: machine,
 	})
 	if err != nil {
 		return false, fmt.Errorf(scopeFailFmt, machine.GetName(), err)
@@ -130,10 +125,9 @@ func (a *Actuator) Update(ctx context.Context, machine *machinev1beta1.Machine) 
 	klog.Infof("%s: actuator updating machine", machine.GetName())
 
 	scope, err := newMachineScope(machineScopeParams{
-		Context:             ctx,
-		client:              a.client,
-		machine:             machine,
-		configManagedClient: a.configManagedClient,
+		Context: ctx,
+		client:  a.client,
+		machine: machine,
 	})
 	if err != nil {
 		fmtErr := fmt.Errorf(scopeFailFmt, machine.GetName(), err)
@@ -179,10 +173,9 @@ func (a *Actuator) Delete(ctx context.Context, machine *machinev1beta1.Machine) 
 	klog.Infof("%s: actuator deleting machine", machine.GetName())
 
 	scope, err := newMachineScope(machineScopeParams{
-		Context:             ctx,
-		client:              a.client,
-		machine:             machine,
-		configManagedClient: a.configManagedClient,
+		Context: ctx,
+		client:  a.client,
+		machine: machine,
 	})
 	if err != nil {
 		fmtErr := fmt.Errorf(scopeFailFmt, machine.GetName(), err)

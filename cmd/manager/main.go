@@ -30,7 +30,6 @@ import (
 	"k8s.io/klog/v2/klogr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
-	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -187,17 +186,10 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	configManagedClient, startCache, err := newConfigManagedClient(mgr)
-	if err != nil {
-		klog.Fatal(err)
-	}
-	mgr.Add(startCache)
-
 	// Initialize machine actuator.
 	machineActuator := machineactuator.NewActuator(machineactuator.ActuatorParams{
-		Client:              mgr.GetClient(),
-		EventRecorder:       mgr.GetEventRecorderFor("nutanixcontroller"),
-		ConfigManagedClient: configManagedClient,
+		Client:        mgr.GetClient(),
+		EventRecorder: mgr.GetEventRecorderFor("nutanixcontroller"),
 	})
 
 	if err := machine.AddWithActuator(mgr, machineActuator, defaultMutableGate); err != nil {
@@ -229,33 +221,4 @@ func main() {
 	}
 }
 
-// newConfigManagedClient returns a controller-runtime client that can be used to access the openshift-config-managed
-// namespace.
-func newConfigManagedClient(mgr manager.Manager) (runtimeclient.Client, manager.Runnable, error) {
-	cacheOpts := cache.Options{
-		Scheme: mgr.GetScheme(),
-		Mapper: mgr.GetRESTMapper(),
-		DefaultNamespaces: map[string]cache.Config{
-			"openshift-config-managed": {},
-		},
-	}
-	cache, err := cache.New(mgr.GetConfig(), cacheOpts)
-	if err != nil {
-		return nil, nil, err
-	}
 
-	clientOpts := runtimeclient.Options{
-		Scheme: mgr.GetScheme(),
-		Mapper: mgr.GetRESTMapper(),
-		Cache: &runtimeclient.CacheOptions{
-			Reader: cache,
-		},
-	}
-
-	cachedClient, err := runtimeclient.New(config.GetConfigOrDie(), clientOpts)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return cachedClient, cache, nil
-}
