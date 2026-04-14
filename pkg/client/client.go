@@ -1,7 +1,8 @@
 package client
 
 import (
-	"fmt"
+	"net"
+	"net/url"
 	"os"
 
 	prismgoclient "github.com/nutanix-cloud-native/prism-go-client"
@@ -39,7 +40,10 @@ func resolveCredentials(options *ClientOptions) {
 		}
 	}
 	if len(options.Credentials.URL) == 0 {
-		options.Credentials.URL = fmt.Sprintf("https://%s:%s", options.Credentials.Endpoint, options.Credentials.Port)
+		options.Credentials.URL = (&url.URL{
+			Scheme: "https",
+			Host:   net.JoinHostPort(options.Credentials.Endpoint, options.Credentials.Port),
+		}).String()
 	}
 }
 

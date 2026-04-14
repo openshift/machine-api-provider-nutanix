@@ -47,8 +47,11 @@ type machineScope struct {
 
 	// client for interacting with Nutanix PC APIs (converged v4)
 	nutanixClient *v4Converged.Client
-	// v3 client for APIs not yet available in converged v4 (e.g. Projects)
+	// v3 client for APIs not yet available in converged v4 (e.g. Projects).
+	// Lazy-initialized via getV3Client() only when needed.
 	nutanixV3Client *nutanixClientV3.Client
+	// clientOptions is cached so the v3 client can be lazy-initialized.
+	clientOptions *clientpkg.ClientOptions
 	// api server controller runtime client
 	client runtimeclient.Client
 	// machine resource
@@ -100,14 +103,22 @@ func newMachineScope(params machineScopeParams) (*machineScope, error) {
 	}
 
 	mscp.nutanixClient = nutanixClient
+	mscp.clientOptions = clientOptions
 
-	v3Client, err := clientpkg.V3Client(clientOptions)
+	return mscp, nil
+}
+
+// getV3Client returns the v3 client, creating it lazily on first use.
+func (s *machineScope) getV3Client() (*nutanixClientV3.Client, error) {
+	if s.nutanixV3Client != nil {
+		return s.nutanixV3Client, nil
+	}
+	v3Client, err := clientpkg.V3Client(s.clientOptions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create nutanix v3 client: %w", err)
 	}
-	mscp.nutanixV3Client = v3Client
-
-	return mscp, nil
+	s.nutanixV3Client = v3Client
+	return v3Client, nil
 }
 
 func (s *machineScope) getNutanixClientOptions() (*clientpkg.ClientOptions, error) {

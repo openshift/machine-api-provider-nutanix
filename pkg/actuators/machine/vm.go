@@ -234,6 +234,14 @@ func validateGPUsConfig(ctx context.Context, mscp *machineScope, fldPath *field.
 	if len(gpus) == 0 {
 		return nil
 	}
+	if mscp.providerSpecValidated.Cluster.UUID == nil || *mscp.providerSpecValidated.Cluster.UUID == "" {
+		fldErrs = append(fldErrs, field.Invalid(
+			fldPath.Child("cluster", "uuid"),
+			ptr.Deref(mscp.providerSpecValidated.Cluster.UUID, ""),
+			"cluster UUID must be resolved before validating GPUs",
+		))
+		return fldErrs
+	}
 	peUUID := *mscp.providerSpecValidated.Cluster.UUID
 	peGPUs, err := getGPUsForPEConverged(ctx, mscp.nutanixClient, peUUID)
 	if err != nil || len(peGPUs) == 0 {
@@ -385,7 +393,6 @@ func validateSubnetsConfig(ctx context.Context, mscp *machineScope, fldPath *fie
 }
 
 func validateProjectConfig(ctx context.Context, mscp *machineScope, fldPath *field.Path) *field.Error {
-	var err error
 	var errMsg string
 
 	switch mscp.providerSpecValidated.Project.Type {
@@ -397,7 +404,11 @@ func validateProjectConfig(ctx context.Context, mscp *machineScope, fldPath *fie
 			return field.Required(fldPath.Child("project", "name"), "Missing projct name")
 		} else {
 			projectName := *mscp.providerSpecValidated.Project.Name
-			projectRefUuidPtr, err := findProjectUuidByName(ctx, mscp.nutanixV3Client, projectName)
+			v3Client, err := mscp.getV3Client()
+			if err != nil {
+				return field.InternalError(fldPath.Child("project"), fmt.Errorf("creating v3 client for project lookup: %w", err))
+			}
+			projectRefUuidPtr, err := findProjectUuidByName(ctx, v3Client, projectName)
 			if err != nil {
 				errMsg = fmt.Sprintf("Failed to find project with name %q. error: %v", projectName, err)
 				return field.Invalid(fldPath.Child("project", "name"), projectName, errMsg)
@@ -411,7 +422,11 @@ func validateProjectConfig(ctx context.Context, mscp *machineScope, fldPath *fie
 			return field.Required(fldPath.Child("project", "uuid"), "Missing project uuid")
 		} else {
 			projectUUID := *mscp.providerSpecValidated.Project.UUID
-			if _, err = getProjectByUUID(ctx, mscp.nutanixV3Client, projectUUID); err != nil {
+			v3Client, err := mscp.getV3Client()
+			if err != nil {
+				return field.InternalError(fldPath.Child("project"), fmt.Errorf("creating v3 client for project lookup: %w", err))
+			}
+			if _, err = getProjectByUUID(ctx, v3Client, projectUUID); err != nil {
 				errMsg = fmt.Sprintf("Failed to find project with uuid %v. error: %v", projectUUID, err)
 				return field.Invalid(fldPath.Child("project", "uuid"), projectUUID, errMsg)
 			}
@@ -444,9 +459,21 @@ func createVM(ctx context.Context, mscp *machineScope, userData []byte) (*vmmMod
 	if mscp.providerStatus.VmUUID != nil {
 		vm, err := findVMByUUID(ctx, mscp.nutanixClient, *mscp.providerStatus.VmUUID)
 		if err == nil {
-			klog.Infof("%s: VM with UUID %s already exists.", vmName, *vm.ExtId)
+			klog.Infof("%s: VM with UUID %s already exists.", vmName, ptr.Deref(vm.ExtId, ""))
 			return vm, nil
 		}
+		if !strings.Contains(strings.ToUpper(err.Error()), "NOT_FOUND") &&
+			!strings.Contains(strings.ToLower(err.Error()), "not found") {
+			return nil, fmt.Errorf("checking existing VM by UUID %s: %w", *mscp.providerStatus.VmUUID, err)
+		}
+	}
+
+	if vm, err := findVMByName(ctx, mscp.nutanixClient, vmName); err == nil {
+		klog.Infof("%s: VM with name %q already exists.", vmName, vmName)
+		return vm, nil
+	} else if !strings.Contains(strings.ToUpper(err.Error()), "NOT_FOUND") &&
+		!strings.Contains(strings.ToLower(err.Error()), "not found") {
+		return nil, fmt.Errorf("checking existing VM by name %q: %w", vmName, err)
 	}
 
 	userdataEncoded := base64.StdEncoding.EncodeToString(userData)
@@ -462,6 +489,9 @@ func createVM(ctx context.Context, mscp *machineScope, userData []byte) (*vmmMod
 		return nil, err
 	}
 
+	if created.ExtId == nil {
+		return nil, fmt.Errorf("VM %q was created but the API returned a nil ExtId", vmName)
+	}
 	vmUuid := *created.ExtId
 	klog.Infof("%s: VM created, UUID: %s. Powering on.", vmName, vmUuid)
 
@@ -620,7 +650,7 @@ func buildV4VMFromScope(ctx context.Context, mscp *machineScope, userdataEncoded
 	// Categories
 	categoryRefs, err := buildV4CategoryRefs(ctx, mscp)
 	if err != nil {
-		klog.Warningf("Failed to build category references for VM %q: %v", vmName, err)
+		return nil, fmt.Errorf("building category references for VM %q: %w", vmName, err)
 	} else if len(categoryRefs) > 0 {
 		vm.Categories = categoryRefs
 	}
@@ -701,8 +731,7 @@ func buildV4CategoryRefs(ctx context.Context, mscp *machineScope) ([]vmmModels.C
 	categoryKey := fmt.Sprintf("%s%s", NutanixCategoryKeyPrefix, clusterID)
 	cat, err := getCategoryValue(ctx, mscp.nutanixClient, categoryKey, NutanixCategoryValue)
 	if err != nil {
-		klog.Warningf("Failed to find cluster ownership category %q=%q: %v", categoryKey, NutanixCategoryValue, err)
-		return refs, nil
+		return nil, fmt.Errorf("failed to find cluster ownership category %q=%q: %w", categoryKey, NutanixCategoryValue, err)
 	}
 	if cat != nil && cat.ExtId != nil {
 		ref := vmmModels.NewCategoryReference()
@@ -784,6 +813,9 @@ func findVMByName(ctx context.Context, client *v4Converged.Client, vmName string
 	if len(vms) > 1 {
 		return nil, fmt.Errorf("found more than one (%d) VMs with name %s", len(vms), vmName)
 	}
+	if vms[0].ExtId == nil {
+		return nil, fmt.Errorf("VM with name %q found but has nil ExtId", vmName)
+	}
 	return findVMByUUID(ctx, client, *vms[0].ExtId)
 }
 
@@ -792,12 +824,18 @@ func deleteVM(ctx context.Context, client *v4Converged.Client, vmUUID string) er
 	klog.Infof("Deleting VM with UUID %s.", vmUUID)
 	op, err := client.VMs.DeleteAsync(ctx, vmUUID)
 	if err != nil {
+		if strings.Contains(strings.ToUpper(err.Error()), "NOT_FOUND") ||
+			strings.Contains(strings.ToLower(err.Error()), "not found") {
+			klog.Infof("VM with uuid %s already deleted (not found)", vmUUID)
+			return nil
+		}
 		klog.Errorf("Error deleting vm with uuid %s: %v", vmUUID, err)
 		return err
 	}
 	_, err = op.Wait(ctx)
 	if err != nil {
-		if strings.Contains(strings.ToUpper(fmt.Sprint(err)), "NOT_FOUND") {
+		if strings.Contains(strings.ToUpper(err.Error()), "NOT_FOUND") ||
+			strings.Contains(strings.ToLower(err.Error()), "not found") {
 			klog.Infof("Successfully deleted vm with uuid %s", vmUUID)
 			return nil
 		}
@@ -908,14 +946,18 @@ func getPrismCentralCluster(ctx context.Context, client *v4Converged.Client) (*c
 	// Prefer cluster with PRISM_CENTRAL in services; otherwise return first if only one.
 	found := clusterModels.Cluster{}
 	for i := range clusters {
-		if clusters[i].ExtId == nil || clusters[i].Config.ClusterFunction == nil || clusters[i].Config == nil ||
-			clusters[i].Config.ClusterFunction[0] != clusterModels.CLUSTERFUNCTIONREF_PRISM_CENTRAL {
+		if clusters[i].ExtId == nil || clusters[i].Config == nil || len(clusters[i].Config.ClusterFunction) == 0 {
 			continue
 		}
-		if reflect.DeepEqual(found, clusterModels.Cluster{}) {
-			found = clusters[i]
+		for _, fn := range clusters[i].Config.ClusterFunction {
+			if fn == clusterModels.CLUSTERFUNCTIONREF_PRISM_CENTRAL {
+				found = clusters[i]
+				break
+			}
 		}
-		break
+		if !reflect.DeepEqual(found, clusterModels.Cluster{}) {
+			break
+		}
 	}
 	if reflect.DeepEqual(found, clusterModels.Cluster{}) {
 		return nil, fmt.Errorf("failed to retrieve Prism Central cluster")
