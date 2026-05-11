@@ -18,7 +18,9 @@ import (
 	dataurl "github.com/vincent-petithory/dataurl"
 
 	nutanixClient "github.com/nutanix-cloud-native/prism-go-client"
+	v4Converged "github.com/nutanix-cloud-native/prism-go-client/converged/v4"
 	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/v3"
+	vmmModels "github.com/nutanix/ntnx-api-golang-clients/vmm-go-client/v4/models/vmm/v4/ahv/config"
 	corev1 "k8s.io/api/core/v1"
 	apimachineryerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,20 +36,22 @@ const (
 type machineScopeParams struct {
 	context.Context
 
-	//nutanixClient nutanixClientV3.Client
 	// api server controller runtime client
 	client runtimeclient.Client
 	// machine resource
 	machine *machinev1beta1.Machine
-	// api server controller runtime client for the openshift-config-managed namespace
-	configManagedClient runtimeclient.Client
 }
 
 type machineScope struct {
 	context.Context
 
-	// client for interacting with Nutanix PC APIs
-	nutanixClient *nutanixClientV3.Client
+	// client for interacting with Nutanix PC APIs (converged v4)
+	nutanixClient *v4Converged.Client
+	// v3 client for APIs not yet available in converged v4 (e.g. Projects).
+	// Lazy-initialized via getV3Client() only when needed.
+	nutanixV3Client *nutanixClientV3.Client
+	// clientOptions is cached so secondary clients can be lazy-initialized.
+	clientOptions *clientpkg.ClientOptions
 	// api server controller runtime client
 	client runtimeclient.Client
 	// machine resource
@@ -99,7 +103,22 @@ func newMachineScope(params machineScopeParams) (*machineScope, error) {
 	}
 
 	mscp.nutanixClient = nutanixClient
+	mscp.clientOptions = clientOptions
+
 	return mscp, nil
+}
+
+// getV3Client returns the v3 client, creating it lazily on first use.
+func (s *machineScope) getV3Client() (*nutanixClientV3.Client, error) {
+	if s.nutanixV3Client != nil {
+		return s.nutanixV3Client, nil
+	}
+	v3Client, err := clientpkg.V3Client(s.clientOptions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create nutanix v3 client: %w", err)
+	}
+	s.nutanixV3Client = v3Client
+	return v3Client, nil
 }
 
 func (s *machineScope) getNutanixClientOptions() (*clientpkg.ClientOptions, error) {
@@ -277,7 +296,7 @@ func (s *machineScope) getUserData() ([]byte, error) {
 	return ignData, nil
 }
 
-func (s *machineScope) setProviderStatus(vm *nutanixClientV3.VMIntentResponse, condition metav1.Condition) error {
+func (s *machineScope) setProviderStatus(vm *vmmModels.Vm, condition metav1.Condition) error {
 
 	klog.Infof("%s: Updating providerStatus", s.machine.Name)
 
@@ -287,7 +306,9 @@ func (s *machineScope) setProviderStatus(vm *nutanixClientV3.VMIntentResponse, c
 	}
 
 	// update the Machine providerStatus
-	s.providerStatus.VmUUID = vm.Metadata.UUID
+	if vm.ExtId != nil {
+		s.providerStatus.VmUUID = vm.ExtId
+	}
 
 	// update Addresses
 	s.machine.Status.Addresses = s.buildNodeAddresses(vm)
@@ -299,19 +320,23 @@ func (s *machineScope) setProviderStatus(vm *nutanixClientV3.VMIntentResponse, c
 	return nil
 }
 
-// buildNodeAddresses creates NodeAddreses from VM.
-func (s *machineScope) buildNodeAddresses(vm *nutanixClientV3.VMIntentResponse) []corev1.NodeAddress {
+// buildNodeAddresses creates NodeAddresses from converged v4 VM.
+// It first tries to extract IPs from the VM's embedded NIC data. If that
+// yields no IPs, it falls back to querying the ListNicsByVmId endpoint
+// which reliably returns NIC network info including learned IP addresses.
+func (s *machineScope) buildNodeAddresses(vm *vmmModels.Vm) []corev1.NodeAddress {
 	nodeAddresses := []corev1.NodeAddress{}
-	ips := []string{}
+	ips := getIPsFromV4Vm(vm)
 
-	for _, nic := range vm.Status.Resources.NicList {
-		for _, ipEndpoint := range nic.IPEndpointList {
-			if ipEndpoint.IP != nil && *ipEndpoint.IP != "" {
-				ip := *ipEndpoint.IP
-				if !isLinkLocal(ip) { // Filter out link-local addresses
-					ips = append(ips, ip)
-				}
-			}
+	if len(ips) == 0 && vm.ExtId != nil {
+		klog.V(3).Infof("%s: no IPs found in embedded NIC data (%d NICs); querying ListNicsByVmId",
+			s.machine.Name, len(vm.Nics))
+		nics, err := listVMNics(s.Context, s.nutanixClient, *vm.ExtId)
+		if err != nil {
+			klog.Errorf("%s: failed to list VM NICs: %v", s.machine.Name, err)
+		} else {
+			klog.V(3).Infof("%s: ListNicsByVmId returned %d NICs", s.machine.Name, len(nics))
+			ips = getIPsFromNics(nics)
 		}
 	}
 
@@ -324,13 +349,86 @@ func (s *machineScope) buildNodeAddresses(vm *nutanixClientV3.VMIntentResponse) 
 		})
 	}
 
-	vmName := *vm.Spec.Name
-	nodeAddresses = append(nodeAddresses,
-		corev1.NodeAddress{Type: corev1.NodeInternalDNS, Address: vmName},
-		corev1.NodeAddress{Type: corev1.NodeHostName, Address: vmName},
-	)
+	if vm.Name != nil && *vm.Name != "" {
+		nodeAddresses = append(nodeAddresses,
+			corev1.NodeAddress{Type: corev1.NodeInternalDNS, Address: *vm.Name},
+			corev1.NodeAddress{Type: corev1.NodeHostName, Address: *vm.Name},
+		)
+	}
 
 	return nodeAddresses
+}
+
+// getIPsFromV4Vm extracts IP addresses from a converged v4 VM's embedded Nics.
+func getIPsFromV4Vm(vm *vmmModels.Vm) []string {
+	if vm == nil {
+		return nil
+	}
+	return getIPsFromNics(vm.Nics)
+}
+
+// getIPsFromNics extracts non-link-local IP addresses from a slice of v4 NICs.
+func getIPsFromNics(nics []vmmModels.Nic) []string {
+	var ips []string
+	for i := range nics {
+		ips = append(ips, getIPsFromNic(&nics[i])...)
+	}
+	return ips
+}
+
+// getIPsFromNic extracts non-link-local IPv4 addresses from a single NIC.
+// It prefers the new OneOf NicNetworkInfo over the deprecated NetworkInfo.
+// SR-IOV NICs lack IP fields in their OneOf type and fall back to the
+// deprecated NetworkInfo. Static IPs (Ipv4Config.IpAddress) are preferred
+// over learned IPs (Ipv4Info.LearnedIpAddresses).
+func getIPsFromNic(nic *vmmModels.Nic) []string {
+	var ipv4Config *vmmModels.Ipv4Config
+	var ipv4Info *vmmModels.Ipv4Info
+
+	if nicInfo := nic.GetNicNetworkInfo(); nicInfo != nil {
+		switch info := nicInfo.(type) {
+		case vmmModels.VirtualEthernetNicNetworkInfo:
+			ipv4Config = info.Ipv4Config
+			ipv4Info = info.Ipv4Info
+		case vmmModels.DpOffloadNicNetworkInfo:
+			ipv4Config = info.Ipv4Config
+			ipv4Info = info.Ipv4Info
+		case vmmModels.SriovNicNetworkInfo:
+			// SR-IOV NICs only carry VlanId; fall through to deprecated NetworkInfo.
+			if nic.NetworkInfo != nil {
+				ipv4Config = nic.NetworkInfo.Ipv4Config
+				ipv4Info = nic.NetworkInfo.Ipv4Info
+			}
+		}
+	} else if nic.NetworkInfo != nil {
+		ipv4Config = nic.NetworkInfo.Ipv4Config
+		ipv4Info = nic.NetworkInfo.Ipv4Info
+	}
+
+	// Prefer statically assigned IP if present.
+	if ipv4Config != nil && ipv4Config.IpAddress != nil && ipv4Config.IpAddress.Value != nil {
+		ip := *ipv4Config.IpAddress.Value
+		if ip != "" && !isLinkLocal(ip) {
+			return []string{ip}
+		}
+	}
+
+	return getIPsFromIpv4Info(ipv4Info)
+}
+
+// getIPsFromIpv4Info extracts non-link-local learned IP addresses from Ipv4Info.
+func getIPsFromIpv4Info(info *vmmModels.Ipv4Info) []string {
+	if info == nil {
+		return nil
+	}
+	var ips []string
+	for _, ip := range info.LearnedIpAddresses {
+		if ip.Value == nil || *ip.Value == "" || isLinkLocal(*ip.Value) {
+			continue
+		}
+		ips = append(ips, *ip.Value)
+	}
+	return ips
 }
 
 // isLinkLocal checks if the address is in the link-local IP range.
