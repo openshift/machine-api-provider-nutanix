@@ -3,8 +3,8 @@ package machine
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -461,8 +461,7 @@ func createVM(ctx context.Context, mscp *machineScope, userData []byte) (*vmmMod
 			klog.Infof("%s: VM with UUID %s already exists.", vmName, ptr.Deref(vm.ExtId, ""))
 			return vm, nil
 		}
-		if !strings.Contains(strings.ToUpper(err.Error()), "NOT_FOUND") &&
-			!strings.Contains(strings.ToLower(err.Error()), "not found") {
+		if !isNotFoundError(err) {
 			return nil, fmt.Errorf("checking existing VM by UUID %s: %w", *mscp.providerStatus.VmUUID, err)
 		}
 	}
@@ -470,8 +469,7 @@ func createVM(ctx context.Context, mscp *machineScope, userData []byte) (*vmmMod
 	if vm, err := findVMByName(ctx, mscp.nutanixClient, vmName); err == nil {
 		klog.Infof("%s: VM with name %q already exists.", vmName, vmName)
 		return vm, nil
-	} else if !strings.Contains(strings.ToUpper(err.Error()), "NOT_FOUND") &&
-		!strings.Contains(strings.ToLower(err.Error()), "not found") {
+	} else if !isNotFoundError(err) {
 		return nil, fmt.Errorf("checking existing VM by name %q: %w", vmName, err)
 	}
 
@@ -663,7 +661,15 @@ func buildV4VMFromScope(ctx context.Context, mscp *machineScope, userdataEncoded
 
 	// Guest customization (cloud-init)
 	cloudInit := vmmModels.NewCloudInit()
-	cloudInit.Metadata = ptr.To(base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(`{"hostname":"%s"}`, vmName))))
+	metadataJSON, err := json.Marshal(map[string]string{"hostname": vmName})
+	if err != nil {
+		return nil, fmt.Errorf("marshalling cloud-init metadata: %w", err)
+	}
+	cloudInit.Metadata = ptr.To(base64.StdEncoding.EncodeToString(metadataJSON))
+	// CONFIG_DRIVE_V2 is the standard datasource type used by OpenStack and
+	// Nutanix AHV for delivering cloud-init metadata/userdata via an attached
+	// virtual CD-ROM. This matches the Nutanix v4 API default and is required
+	// for RHCOS ignition-based provisioning on AHV.
 	cloudInit.DatasourceType = vmmModels.CLOUDINITDATASOURCETYPE_CONFIG_DRIVE_V2.Ref()
 	userData := vmmModels.NewUserdata()
 	userData.Value = &userdataEncoded
@@ -823,8 +829,7 @@ func deleteVM(ctx context.Context, client *v4Converged.Client, vmUUID string) er
 	klog.Infof("Deleting VM with UUID %s.", vmUUID)
 	op, err := client.VMs.DeleteAsync(ctx, vmUUID)
 	if err != nil {
-		if strings.Contains(strings.ToUpper(err.Error()), "NOT_FOUND") ||
-			strings.Contains(strings.ToLower(err.Error()), "not found") {
+		if isNotFoundError(err) {
 			klog.Infof("VM with uuid %s already deleted (not found)", vmUUID)
 			return nil
 		}
@@ -833,8 +838,7 @@ func deleteVM(ctx context.Context, client *v4Converged.Client, vmUUID string) er
 	}
 	_, err = op.Wait(ctx)
 	if err != nil {
-		if strings.Contains(strings.ToUpper(err.Error()), "NOT_FOUND") ||
-			strings.Contains(strings.ToLower(err.Error()), "not found") {
+		if isNotFoundError(err) {
 			klog.Infof("Successfully deleted vm with uuid %s", vmUUID)
 			return nil
 		}
@@ -942,6 +946,18 @@ func getCategoryValue(ctx context.Context, client *v4Converged.Client, key, valu
 // network info including IPs.
 func listVMNics(ctx context.Context, client *v4Converged.Client, vmUUID string) ([]vmmModels.Nic, error) {
 	return client.ListNicsByVmId(ctx, vmUUID)
+}
+
+// getClusterNameByUUID resolves a PE cluster UUID to its human-readable name.
+func getClusterNameByUUID(ctx context.Context, client *v4Converged.Client, uuid string) (string, error) {
+	cluster, err := client.Clusters.Get(ctx, uuid)
+	if err != nil {
+		return "", fmt.Errorf("fetching cluster %s: %w", uuid, err)
+	}
+	if cluster.Name != nil && *cluster.Name != "" {
+		return *cluster.Name, nil
+	}
+	return "Unnamed", nil
 }
 
 // getPrismCentralCluster returns the Prism Central cluster using converged client.

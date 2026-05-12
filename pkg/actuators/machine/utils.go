@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	v4Converged "github.com/nutanix-cloud-native/prism-go-client/converged/v4"
 	configv1 "github.com/openshift/api/config/v1"
@@ -137,6 +138,15 @@ func getGPUFromListConverged(gpu machinev1.NutanixGPU, devices []gpuDeviceInfo) 
 		}
 	}
 	return nil, fmt.Errorf("no available GPU found that matches required GPU inputs")
+}
+
+// isNotFoundError returns true if the error message indicates a resource was not found.
+func isNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "not_found") || strings.Contains(msg, "not found")
 }
 
 // Nutanix Credentials

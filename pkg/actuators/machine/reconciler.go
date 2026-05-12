@@ -3,7 +3,6 @@ package machine
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	vmmModels "github.com/nutanix/ntnx-api-golang-clients/vmm-go-client/v4/models/vmm/v4/ahv/config"
@@ -125,9 +124,9 @@ func (r *Reconciler) update() error {
 		}
 	}
 
-	// v4 VM does not have Status.State; skip ERROR state check
 	if vm.Name != nil {
-		klog.V(4).Infof("Retrieved VM %q (UUID %s)", *vm.Name, ptr.Deref(vm.ExtId, ""))
+		klog.V(4).Infof("Retrieved VM %q (UUID %s, PowerState %s)",
+			*vm.Name, ptr.Deref(vm.ExtId, ""), vmPowerStateName(vm))
 	}
 	if err = r.updateMachineWithVMState(ctx, vm); err != nil {
 		metrics.RegisterFailedInstanceUpdate(&metrics.MachineLabels{
@@ -164,7 +163,7 @@ func (r *Reconciler) delete() error {
 		vm, err = findVMByName(ctx, r.nutanixClient, r.machine.Name)
 	}
 	if err != nil {
-		if strings.Contains(strings.ToUpper(err.Error()), "NOT_FOUND") || strings.Contains(strings.ToLower(err.Error()), "not found") {
+		if isNotFoundError(err) {
 			klog.Warningf("%s: the machine vm does not exist", r.machine.Name)
 			return nil
 		}
@@ -225,7 +224,7 @@ func (r *Reconciler) exists() (bool, error) {
 	}
 
 	if err != nil {
-		if strings.Contains(strings.ToUpper(err.Error()), "NOT_FOUND") || strings.Contains(strings.ToLower(err.Error()), "not found") {
+		if isNotFoundError(err) {
 			return false, nil
 		}
 
@@ -338,7 +337,12 @@ func (r *Reconciler) updateMachineWithVMState(ctx context.Context, vm *vmmModels
 	}
 	vmZone := "Unnamed"
 	if vm.Cluster != nil && vm.Cluster.ExtId != nil {
-		vmZone = *vm.Cluster.ExtId
+		clusterName, err := getClusterNameByUUID(ctx, r.nutanixClient, *vm.Cluster.ExtId)
+		if err != nil {
+			klog.Warningf("%s: failed to resolve PE cluster name for UUID %s: %v", r.machine.Name, *vm.Cluster.ExtId, err)
+		} else {
+			vmZone = clusterName
+		}
 	}
 	if vmZone == "Unnamed" {
 		klog.Warningf("%s: machine.openshift.io/zone label is 'Unnamed' (prism-element cluster name not set).", r.machine.Name)
@@ -355,14 +359,25 @@ func (r *Reconciler) updateMachineWithVMState(ctx context.Context, vm *vmmModels
 	if r.machine.Annotations == nil {
 		r.machine.Annotations = map[string]string{}
 	}
-	vmState := "COMPLETE"
-	powerState := "UNKNOWN"
-	if vm.PowerState != nil {
-		powerState = vm.PowerState.GetName()
+	powerState := vmPowerStateName(vm)
+	// The v4 API does not expose a separate task/lifecycle state like the v3
+	// "COMPLETE"/"ERROR". Derive the instance state from PowerState:
+	// ON -> "ACTIVE", everything else -> the power state name itself.
+	vmState := powerState
+	if powerState == "ON" {
+		vmState = "ACTIVE"
 	}
 	r.machine.Annotations[machinecontroller.MachineInstanceStateAnnotationName] = vmState
 	r.machine.Annotations[MachineInstancePowerStateAnnotationName] = powerState
 
 	klog.Infof("%s: updated machine instance labels/annotations.", r.machine.Name)
 	return nil
+}
+
+// vmPowerStateName returns the power state name string for a v4 VM.
+func vmPowerStateName(vm *vmmModels.Vm) string {
+	if vm == nil || vm.PowerState == nil {
+		return "UNKNOWN"
+	}
+	return vm.PowerState.GetName()
 }
