@@ -88,6 +88,9 @@ func TestMachineEvents(t *testing.T) {
 		g.Expect(k8sClient.Delete(ctx, userDataSecret)).To(Succeed())
 	}()
 
+	// nilCtx is intentionally nil to verify that newMachineScope rejects nil context.
+	var nilCtx context.Context
+
 	cases := []struct {
 		name         string
 		machineName  string
@@ -101,7 +104,7 @@ func TestMachineEvents(t *testing.T) {
 			machineName:  "test-machine",
 			providerSpec: getValidProviderSpec(""),
 			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
-				actuator.Create(nil, machine)
+				actuator.Create(nilCtx, machine)
 			},
 			events: []string{"context and machine should not be nil"},
 		},
@@ -162,7 +165,7 @@ func TestMachineEvents(t *testing.T) {
 			machineName:  "test-machine",
 			providerSpec: getValidProviderSpec(""),
 			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
-				actuator.Update(nil, machine)
+				actuator.Update(nilCtx, machine)
 			},
 			events: []string{"context and machine should not be nil"},
 		},
@@ -181,7 +184,7 @@ func TestMachineEvents(t *testing.T) {
 			machineName:  "test-machine",
 			providerSpec: getValidProviderSpec(""),
 			operation: func(actuator *Actuator, machine *machinev1beta1.Machine) {
-				actuator.Delete(nil, machine)
+				actuator.Delete(nilCtx, machine)
 			},
 			events: []string{"context and machine should not be nil"},
 		},
@@ -262,19 +265,27 @@ func TestMachineEvents(t *testing.T) {
 			actuator := NewActuator(params)
 			tc.operation(actuator, machine)
 
-			eventList := &v1.EventList{}
+			var machineEvents []v1.Event
 			waitForEvent := func() error {
+				eventList := &v1.EventList{}
 				err := k8sClient.List(ctx, eventList, client.InNamespace(machine.Namespace))
 				if err != nil {
 					return err
 				}
 
-				if len(eventList.Items) != 1 {
-					return fmt.Errorf("expected len 1, got %d", len(eventList.Items))
+				machineEvents = nil
+				for _, e := range eventList.Items {
+					if e.InvolvedObject.UID == machine.UID {
+						machineEvents = append(machineEvents, e)
+					}
 				}
 
-				if eventList.Items[0].Count != 1 {
-					return fmt.Errorf("expected event %v to happen only once", eventList.Items[0].Name)
+				if len(machineEvents) != 1 {
+					return fmt.Errorf("expected 1 event for machine %s (UID %s), got %d", machine.Name, machine.UID, len(machineEvents))
+				}
+
+				if machineEvents[0].Count != 1 {
+					return fmt.Errorf("expected event %v to happen only once", machineEvents[0].Name)
 				}
 				return nil
 			}
@@ -282,11 +293,11 @@ func TestMachineEvents(t *testing.T) {
 			gs.Eventually(waitForEvent, timeout).Should(Succeed())
 
 			for _, msg := range tc.events {
-				gs.Expect(eventList.Items[0].Message).To(ContainSubstring(msg))
+				gs.Expect(machineEvents[0].Message).To(ContainSubstring(msg))
 			}
 
-			for i := range eventList.Items {
-				gs.Expect(k8sClient.Delete(ctx, &eventList.Items[i])).To(Succeed())
+			for i := range machineEvents {
+				gs.Expect(k8sClient.Delete(ctx, &machineEvents[i])).To(Succeed())
 			}
 		})
 	}

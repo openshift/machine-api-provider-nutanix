@@ -3,17 +3,16 @@ package machine
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
-	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/v3"
+	vmmModels "github.com/nutanix/ntnx-api-golang-clients/vmm-go-client/v4/models/vmm/v4/ahv/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/openshift/machine-api-operator/pkg/metrics"
-	clientpkg "github.com/openshift/machine-api-provider-nutanix/pkg/client"
 )
 
 const (
@@ -70,7 +69,7 @@ func (r *Reconciler) create() error {
 		return fmt.Errorf("failed to create VM: %w", err)
 	}
 
-	klog.Infof("Created VM %q, with vm uuid: %s", r.machine.Name, *vm.Metadata.UUID)
+	klog.Infof("Created VM %q, with vm uuid: %s", r.machine.Name, ptr.Deref(vm.ExtId, ""))
 	if err = r.updateMachineWithVMState(ctx, vm); err != nil {
 		return fmt.Errorf("failed to update machine with vm state: %w", err)
 	}
@@ -92,9 +91,8 @@ func (r *Reconciler) update() error {
 		return fmt.Errorf("%v: failed validating machine provider spec: %w", r.machine.GetName(), err)
 	}
 
-	var vm *nutanixClientV3.VMIntentResponse
+	var vm *vmmModels.Vm
 	if r.providerStatus.VmUUID == nil {
-		// Try to find the vm by name
 		vm, err = findVMByName(ctx, r.nutanixClient, r.machine.Name)
 		if err != nil {
 			metrics.RegisterFailedInstanceUpdate(&metrics.MachineLabels{
@@ -107,7 +105,7 @@ func (r *Reconciler) update() error {
 			r.machineScope.setProviderStatus(nil, conditionFailed(machineUpdate, err.Error()))
 			return err
 		}
-		r.providerStatus.VmUUID = vm.Metadata.UUID
+		r.providerStatus.VmUUID = vm.ExtId
 
 	} else {
 		// find the existing VM with the vmUuid
@@ -126,20 +124,10 @@ func (r *Reconciler) update() error {
 		}
 	}
 
-	// The found VM is in ERROR state
-	if *vm.Status.State == "ERROR" {
-		errMsg := clientpkg.GetMessageListString(vm.Status.MessageList)
-		err = fmt.Errorf("The retrieved VM %q has ERROR state. error: %s", *vm.Spec.Name, errMsg)
-		klog.Error(err)
-		metrics.RegisterFailedInstanceUpdate(&metrics.MachineLabels{
-			Name:      r.machine.Name,
-			Namespace: r.machine.Namespace,
-			Reason:    "The VM is in ERROR state",
-		})
-		r.machineScope.setProviderStatus(nil, conditionFailed(machineUpdate, err.Error()))
-		return err
+	if vm.Name != nil {
+		klog.V(4).Infof("Retrieved VM %q (UUID %s, PowerState %s)",
+			*vm.Name, ptr.Deref(vm.ExtId, ""), vmPowerStateName(vm))
 	}
-
 	if err = r.updateMachineWithVMState(ctx, vm); err != nil {
 		metrics.RegisterFailedInstanceUpdate(&metrics.MachineLabels{
 			Name:      r.machine.Name,
@@ -166,28 +154,24 @@ func (r *Reconciler) delete() error {
 	defer cancel()
 
 	var err error
-	var vm *nutanixClientV3.VMIntentResponse
+	var vm *vmmModels.Vm
 
 	// Check if the machine vm exists
 	if r.providerStatus.VmUUID != nil {
-		// Try to find the vm by uuid
 		vm, err = findVMByUUID(ctx, r.nutanixClient, *r.providerStatus.VmUUID)
 	} else {
-		// Try to find the vm by name
 		vm, err = findVMByName(ctx, r.nutanixClient, r.machine.Name)
 	}
 	if err != nil {
-		if strings.Contains(err.Error(), "NOT_FOUND") {
-			// Not found the machine vm, could be deleted or not created yet.
+		if isNotFoundError(err) {
 			klog.Warningf("%s: the machine vm does not exist", r.machine.Name)
 			return nil
 		}
-
-		klog.Errorf("%s: error finding the machine vm. %v", r.machine.Name, err)
+		klog.Errorf("%s: error finding the machine vm: %v", r.machine.Name, err)
 		return err
 	}
 
-	vmUuid := *vm.Metadata.UUID
+	vmUuid := ptr.Deref(vm.ExtId, "")
 
 	// Ensure volumes are detached before deleting the Node.
 	if r.isNodeLinked() {
@@ -240,7 +224,7 @@ func (r *Reconciler) exists() (bool, error) {
 	}
 
 	if err != nil {
-		if strings.Contains(err.Error(), "NOT_FOUND") {
+		if isNotFoundError(err) {
 			return false, nil
 		}
 
@@ -328,32 +312,42 @@ func (r *Reconciler) setProviderID(vmUUID *string) error {
 	return nil
 }
 
-func (r *Reconciler) updateMachineWithVMState(ctx context.Context, vm *nutanixClientV3.VMIntentResponse) error {
+func (r *Reconciler) updateMachineWithVMState(ctx context.Context, vm *vmmModels.Vm) error {
 	if vm == nil {
 		return nil
 	}
 
 	klog.Infof("%s: updating machine providerID", r.machine.Name)
-	err := r.setProviderID(vm.Metadata.UUID)
-	if err != nil {
+	if err := r.setProviderID(vm.ExtId); err != nil {
 		return err
 	}
 
 	pcCluster, err := getPrismCentralCluster(ctx, r.nutanixClient)
 	if err != nil {
-		klog.Errorf("%s: failed to get prism central cluster. %v", r.machine.Name, err)
+		klog.Errorf("%s: failed to get prism central cluster: %v", r.machine.Name, err)
 		return err
 	}
 
-	vmRegion := *pcCluster.Spec.Name
+	vmRegion := "Unnamed"
+	if pcCluster.Name != nil {
+		vmRegion = *pcCluster.Name
+	}
 	if vmRegion == "Unnamed" {
-		klog.Warningf("%s: the machine.openshift.io/region label value is 'Unnamed', due to the prism-central cluster name not being set.", r.machine.Name)
+		klog.Warningf("%s: machine.openshift.io/region label is 'Unnamed' (prism-central cluster name not set).", r.machine.Name)
 	}
-	vmZone := *vm.Status.ClusterReference.Name
+	vmZone := "Unnamed"
+	if vm.Cluster != nil && vm.Cluster.ExtId != nil {
+		clusterName, err := getClusterNameByUUID(ctx, r.nutanixClient, *vm.Cluster.ExtId)
+		if err != nil {
+			klog.Warningf("%s: failed to resolve PE cluster name for UUID %s: %v", r.machine.Name, *vm.Cluster.ExtId, err)
+		} else {
+			vmZone = clusterName
+		}
+	}
 	if vmZone == "Unnamed" {
-		klog.Warningf("%s: the machine.openshift.io/zone label value is 'Unnamed', due to the prism-element cluster name not being set.", r.machine.Name)
+		klog.Warningf("%s: machine.openshift.io/zone label is 'Unnamed' (prism-element cluster name not set).", r.machine.Name)
 	}
-	vmType := stringPointerDeref(vm.Status.Resources.HypervisorType)
+	vmType := "AHV"
 
 	if r.machine.Labels == nil {
 		r.machine.Labels = map[string]string{}
@@ -365,11 +359,25 @@ func (r *Reconciler) updateMachineWithVMState(ctx context.Context, vm *nutanixCl
 	if r.machine.Annotations == nil {
 		r.machine.Annotations = map[string]string{}
 	}
-	vmState := stringPointerDeref(vm.Status.State)
-	powerState := stringPointerDeref(vm.Status.Resources.PowerState)
+	powerState := vmPowerStateName(vm)
+	// The v4 API does not expose a separate task/lifecycle state like the v3
+	// "COMPLETE"/"ERROR". Derive the instance state from PowerState:
+	// ON -> "ACTIVE", everything else -> the power state name itself.
+	vmState := powerState
+	if powerState == "ON" {
+		vmState = "ACTIVE"
+	}
 	r.machine.Annotations[machinecontroller.MachineInstanceStateAnnotationName] = vmState
 	r.machine.Annotations[MachineInstancePowerStateAnnotationName] = powerState
 
 	klog.Infof("%s: updated machine instance labels/annotations.", r.machine.Name)
 	return nil
+}
+
+// vmPowerStateName returns the power state name string for a v4 VM.
+func vmPowerStateName(vm *vmmModels.Vm) string {
+	if vm == nil || vm.PowerState == nil {
+		return "UNKNOWN"
+	}
+	return vm.PowerState.GetName()
 }
