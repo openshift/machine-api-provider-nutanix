@@ -473,7 +473,16 @@ func createVM(ctx context.Context, mscp *machineScope, userData []byte) (*vmmMod
 		return nil, fmt.Errorf("checking existing VM by name %q: %w", vmName, err)
 	}
 
-	userdataEncoded := base64.StdEncoding.EncodeToString(userData)
+	// Wrap Ignition configs in MIME multipart format for Nutanix v4.2+ API compatibility.
+	// The Nutanix v4.2 API validates CloudInit userdata for a '#cloud-config' header,
+	// which fails for Ignition configs that start with '{"ignition":...}'.
+	var userdataEncoded string
+	if IsIgnitionConfig(userData) {
+		userdataEncoded = WrapIgnitionForNutanix(userData)
+		klog.V(3).Infof("%s: Wrapped Ignition config in MIME multipart for Nutanix v4.2+ API", mscp.machine.Name)
+	} else {
+		userdataEncoded = base64.StdEncoding.EncodeToString(userData)
+	}
 	v4vm, err := buildV4VMFromScope(ctx, mscp, userdataEncoded)
 	if err != nil {
 		return nil, fmt.Errorf("building v4 VM spec: %w", err)
