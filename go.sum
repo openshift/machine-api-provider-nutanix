@@ -380,8 +380,8 @@ github.com/nishanths/predeclared v0.2.2 h1:V2EPdZPliZymNAn79T8RkNApBjMmVKh5XRpLm
 github.com/nishanths/predeclared v0.2.2/go.mod h1:RROzoN6TnGQupbC+lqggsOlcgysk3LMK/HI84Mp280c=
 github.com/nunnatsa/ginkgolinter v0.19.1 h1:mjwbOlDQxZi9Cal+KfbEJTCz327OLNfwNvoZ70NJ+c4=
 github.com/nunnatsa/ginkgolinter v0.19.1/go.mod h1:jkQ3naZDmxaZMXPWaS9rblH+i+GWXQCaS/JFIWcOH2s=
-github.com/nutanix-cloud-native/prism-go-client v0.5.4 h1:MUZ3dSDRhBQWAYn1HQ0JRb/O0N13GILwiMHMlMT92Zo=
-github.com/nutanix-cloud-native/prism-go-client v0.5.4/go.mod h1:N/O9fz5fimjb30RxlPbKbGs/Z2lqMgDqrb6CrsZvQrA=
+github.com/nutanix-cloud-native/prism-go-client v0.5.5 h1:xonicVCBo/JASp0R2ivlksLDAnnxSAQqsISXBqoNeYs=
+github.com/nutanix-cloud-native/prism-go-client v0.5.5/go.mod h1:N/O9fz5fimjb30RxlPbKbGs/Z2lqMgDqrb6CrsZvQrA=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
 github.com/nxadm/tail v1.4.8/go.mod h1:+ncqLTQzXmGhMZNUePPaPqPvBxHAIsmXswZKocGu+AU=
 github.com/oklog/ulid v1.3.1 h1:EGfNDEx6MqHz8B3uNV6QAib1UR2Lm97sHi3ocA6ESJ4=
