@@ -7,7 +7,7 @@ require (
 	github.com/coreos/ignition/v2 v2.24.0
 	github.com/go-logr/logr v1.4.3
 	github.com/golang/mock v1.6.0
-	github.com/nutanix-cloud-native/prism-go-client v0.5.4
+	github.com/nutanix-cloud-native/prism-go-client v0.5.5
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.0
 	github.com/openshift/api v0.0.0-20260320105832-c73917c76a14
