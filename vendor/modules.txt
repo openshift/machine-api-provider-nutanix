@@ -206,7 +206,7 @@ github.com/monochromegane/go-gitignore
 # github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 ## explicit
 github.com/munnerz/goautoneg
-# github.com/nutanix-cloud-native/prism-go-client v0.5.4
+# github.com/nutanix-cloud-native/prism-go-client v0.5.5
 ## explicit; go 1.21
 github.com/nutanix-cloud-native/prism-go-client
 github.com/nutanix-cloud-native/prism-go-client/environment/types
